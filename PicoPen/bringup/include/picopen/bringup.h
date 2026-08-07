@@ -1,0 +1,8 @@
+#ifndef PICOPEN_BRINGUP_H
+#define PICOPEN_BRINGUP_H
+
+#define PICOPEN_BRINGUP_BANNER "PicoPen safe bring-up"
+#define PICOPEN_HEARTBEAT_PERIOD_MS 5000u
+#define PICOPEN_USB_SETTLE_MS 1500u
+
+#endif

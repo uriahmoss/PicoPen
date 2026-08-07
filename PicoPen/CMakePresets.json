@@ -1,0 +1,40 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "pico2w-debug",
+      "displayName": "Pico 2 W - Debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/pico2w-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "PICO_BOARD": "pico2_w"
+      }
+    },
+    {
+      "name": "pico2w-release",
+      "displayName": "Pico 2 W - Release",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/pico2w-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "PICO_BOARD": "pico2_w"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "pico2w-debug",
+      "configurePreset": "pico2w-debug"
+    },
+    {
+      "name": "pico2w-release",
+      "configurePreset": "pico2w-release"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+# Build outputs
+build/
+out/
+.deps/
+*.elf
+*.uf2
+*.bin
+*.hex
+*.map
+
+# Tooling and editors
+.cache/
+.idea/
+.vscode/
+*.swp
+*.user
+
+# Local SDK configuration and secrets
+.env
+CMakeUserPresets.json
+keys/
+captures/
+
+# Operating systems
+.DS_Store
+Thumbs.db
