@@ -20,7 +20,12 @@
   - [x] Allocate erase-aligned boot, metadata, image, and persistent regions
   - [x] Define the fixed-size v1 image header and validation order
   - [x] Document development policy, recovery behavior, and handoff boundary
-- [ ] **Slice 1B:** Build bootloader and OS as separate link targets
+- [x] **Slice 1B:** Build bootloader and OS as separate link targets
+  - [x] Link `picopen_bootloader` only inside the 256 KiB stage-1 region
+  - [x] Link `picopen_os` at the primary slot payload address
+  - [x] Produce independent ELF, BIN, HEX, map, disassembly, and UF2 artifacts
+  - [x] Verify the OS UF2 block range remains inside its contracted slot
+  - [x] Preserve the existing `picopen_bringup` target
 - [ ] **Slice 1C:** Validate the OS header, bounds, and SHA-256 digest
 - [ ] **Slice 1D:** Transfer control to the validated minimal OS
 - [ ] **Slice 1E:** Add watchdog, boot attempts, and boot-success handshake

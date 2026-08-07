@@ -89,6 +89,18 @@ Before entering a validated OS, the bootloader will eventually:
 Exact RP2350 handoff mechanics belong to Slice 1D and are not implemented by
 this specification slice.
 
+## Build artifacts
+
+Slice 1B produces two independently linked targets:
+
+- `picopen_bootloader`, a ROM-bootable recovery skeleton constrained to
+  `0x10000000..0x1003FFFF`
+- `picopen_os`, a relocated slot payload beginning at `0x10051000`
+
+The OS UF2 is an address-bearing development payload, not a standalone ROM
+image. It is not safe to flash by itself. Slice 1C adds the manifest packaging
+and validation path; Slice 1D adds controlled transfer from bootloader to OS.
+
 ## Failure and recovery contract
 
 - No valid image: stay in a bounded USB recovery console and advertise the

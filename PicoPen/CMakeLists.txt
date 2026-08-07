@@ -59,4 +59,8 @@ set(CMAKE_CXX_EXTENSIONS ON)
 
 pico_sdk_init()
 
+include(cmake/PicoPenTarget.cmake)
+
+add_subdirectory(bootloader)
 add_subdirectory(bringup)
+add_subdirectory(os)
