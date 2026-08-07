@@ -93,13 +93,19 @@ identity, while invalid images enter a recoverable state.
   - [x] Transcribe and cross-check display and keyboard pin assignments
   - [x] Centralize the draft pins without activating GPIO
   - [x] Confirm `CPI 2.0` on the physical mainboard marking
-- [ ] Display diagnostic pattern and terminal renderer
+- [x] Display diagnostic pattern and terminal renderer
   - [x] Add a bounded blocking SPI1 display driver using the verified pins
   - [x] Add a fixed synthwave color-band and alignment-grid diagnostic
   - [x] Verify the diagnostic pattern on the physical CPI 2.0 display
     - Hardware evidence: all synthwave color bands and the gold alignment grid
       rendered correctly across the installed 320 x 320 panel.
-  - [ ] Add the terminal glyph renderer and bounded dirty-region updates
+  - [x] Add the terminal glyph renderer and bounded dirty-region updates
+    - [x] Define a 40 x 20 fixed-cell terminal and synthwave palette
+    - [x] Add a repository-owned boot-console glyph subset
+    - [x] Add bounded newline, carriage-return, wrap, and dirty-cell rendering
+    - [x] Verify the terminal diagnostic on the physical CPI 2.0 display
+      - Hardware evidence: all expected boot-console lines rendered legibly,
+        correctly oriented, and within the 320 x 320 panel bounds.
 - [ ] Keyboard input and power events
 - [ ] SD read-only operation, then safe writes
 - [ ] Battery status and controlled shutdown

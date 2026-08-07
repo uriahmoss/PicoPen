@@ -38,6 +38,12 @@ Color bands and the 40-pixel alignment grid were visually correct. This accepts
 the blocking display transport for bring-up; framebuffer ownership, terminal
 glyphs, DMA, and partial redraw scheduling remain separate work.
 
+The follow-on 40 x 20 fixed-cell terminal diagnostic rendered every expected
+boot-console line legibly, with correct orientation and no screen-edge clipping.
+This accepts the initial glyph and dirty-cell path. The current repository-owned
+font intentionally covers boot-console characters; a complete UI font and ANSI
+parser remain later UI work.
+
 ## Bring-up order
 
 1. SWD and serial logging

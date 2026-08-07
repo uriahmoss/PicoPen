@@ -11,6 +11,7 @@
 #include "picopen/boot_format.h"
 #include "picopen/boot_metadata.h"
 #include "picopen/display.h"
+#include "picopen/terminal.h"
 
 #ifndef PICOPEN_VERSION
 #define PICOPEN_VERSION "unknown"
@@ -72,10 +73,17 @@ int main(void) {
            PICOPEN_BOOT_MAX_ATTEMPTS);
     const bool display_ready = picopen_display_init();
     if (display_ready) {
-        picopen_display_draw_diagnostic();
+        picopen_terminal_init();
+        picopen_terminal_write(
+            "PICOPEN TERMINAL 0.0.1\n"
+            "CPI 2.0 DISPLAY: READY\n"
+            "BOOT: PRIMARY CONFIRMED\n"
+            "STATUS: MINIMAL OS RUNNING\n\n"
+            "> SYNTHWAVE CONSOLE ONLINE");
+        picopen_terminal_render();
     }
     printf("display: %s\r\n",
-           display_ready ? "synthwave diagnostic rendered" : "unavailable");
+           display_ready ? "terminal diagnostic rendered" : "unavailable");
 
     for (;;) {
         printf("os-heartbeat: %llu ms\r\n", time_us_64() / 1000u);

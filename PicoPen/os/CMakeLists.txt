@@ -1,5 +1,6 @@
 add_executable(picopen_os
     ../drivers/display/display.c
+    ../drivers/terminal/terminal.c
     src/main.c
 )
 
@@ -15,6 +16,7 @@ target_link_libraries(picopen_os PRIVATE
 target_include_directories(picopen_os PRIVATE
     ${PROJECT_SOURCE_DIR}/boards/picocalc_pico2w/include
     ${PROJECT_SOURCE_DIR}/drivers/display/include
+    ${PROJECT_SOURCE_DIR}/drivers/terminal/include
 )
 target_compile_definitions(picopen_os PRIVATE
     PICO_CRT0_INCLUDE_PICOBIN_ENTRY_POINT_ITEM=1

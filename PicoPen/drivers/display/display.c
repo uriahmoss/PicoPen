@@ -57,8 +57,8 @@ static void set_window(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1) {
     write_command(DISPLAY_COMMAND_WRITE, NULL, 0u);
 }
 
-static void fill_rectangle(uint16_t x, uint16_t y, uint16_t width,
-                           uint16_t height, uint32_t rgb) {
+void picopen_display_fill_rect(uint16_t x, uint16_t y, uint16_t width,
+                               uint16_t height, uint32_t rgb) {
     if ((width == 0u) || (height == 0u) ||
         ((uint32_t)x + width > DISPLAY_WIDTH) ||
         ((uint32_t)y + height > DISPLAY_HEIGHT)) {
@@ -150,13 +150,13 @@ void picopen_display_draw_diagnostic(void) {
         const uint16_t height = index == 5u
             ? (uint16_t)(DISPLAY_HEIGHT - y)
             : band_height;
-        fill_rectangle(0u, y, DISPLAY_WIDTH, height, bands[index]);
+        picopen_display_fill_rect(0u, y, DISPLAY_WIDTH, height, bands[index]);
     }
     for (uint16_t coordinate = 0u; coordinate < DISPLAY_WIDTH;
          coordinate += 40u) {
-        fill_rectangle(coordinate, 0u, 1u, DISPLAY_HEIGHT,
-                       UINT32_C(0xFFCC00));
-        fill_rectangle(0u, coordinate, DISPLAY_WIDTH, 1u,
-                       UINT32_C(0xFFCC00));
+        picopen_display_fill_rect(coordinate, 0u, 1u, DISPLAY_HEIGHT,
+                                  UINT32_C(0xFFCC00));
+        picopen_display_fill_rect(0u, coordinate, DISPLAY_WIDTH, 1u,
+                                  UINT32_C(0xFFCC00));
     }
 }
