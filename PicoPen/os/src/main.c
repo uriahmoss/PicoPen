@@ -11,6 +11,7 @@
 #include "picopen/boot_format.h"
 #include "picopen/boot_metadata.h"
 #include "picopen/display.h"
+#include "picopen/keyboard.h"
 #include "picopen/terminal.h"
 
 #ifndef PICOPEN_VERSION
@@ -72,21 +73,71 @@ int main(void) {
     printf("boot-success: confirmed; attempts reset to 0/%u\r\n",
            PICOPEN_BOOT_MAX_ATTEMPTS);
     const bool display_ready = picopen_display_init();
+    picopen_keyboard_info_t keyboard_info;
+    const bool keyboard_ready = picopen_keyboard_init(&keyboard_info);
     if (display_ready) {
+        char keyboard_status[40];
+        if (keyboard_ready) {
+            snprintf(keyboard_status, sizeof(keyboard_status),
+                     "KBD FW: 0X%02X READY %luK\n",
+                     keyboard_info.response[1],
+                     (unsigned long)(keyboard_info.baud_hz / 1000u));
+        } else {
+            snprintf(keyboard_status, sizeof(keyboard_status),
+                     "KBD NACK L:%u%u ADDR:%02X\n",
+                     keyboard_info.sda_high ? 1u : 0u,
+                     keyboard_info.scl_high ? 1u : 0u,
+                     keyboard_info.found_address);
+        }
         picopen_terminal_init();
         picopen_terminal_write(
             "PICOPEN TERMINAL 0.0.1\n"
             "CPI 2.0 DISPLAY: READY\n"
             "BOOT: PRIMARY CONFIRMED\n"
-            "STATUS: MINIMAL OS RUNNING\n\n"
-            "> SYNTHWAVE CONSOLE ONLINE");
+            "STATUS: MINIMAL OS RUNNING\n");
+        picopen_terminal_write(keyboard_status);
+        picopen_terminal_write("\n> ");
         picopen_terminal_render();
     }
     printf("display: %s\r\n",
            display_ready ? "terminal diagnostic rendered" : "unavailable");
+    printf("keyboard: %s; firmware=0x%02x; baud=%lu; write=%d; read=%d; "
+           "raw=%02x%02x; lines=%u%u; found=0x%02x\r\n",
+           keyboard_ready ? "ready" : "unavailable",
+           keyboard_info.response[1], (unsigned long)keyboard_info.baud_hz,
+           keyboard_info.write_result, keyboard_info.read_result,
+           keyboard_info.response[0], keyboard_info.response[1],
+           keyboard_info.sda_high ? 1u : 0u,
+           keyboard_info.scl_high ? 1u : 0u,
+           keyboard_info.found_address);
 
     for (;;) {
-        printf("os-heartbeat: %llu ms\r\n", time_us_64() / 1000u);
-        sleep_ms(5000u);
+        picopen_key_event_t event;
+        if (keyboard_ready && picopen_keyboard_poll(&event) &&
+            (event.state == PICOPEN_KEY_PRESSED)) {
+            char key_text[8];
+            if ((event.key >= 0x20u) && (event.key <= 0x7Eu)) {
+                key_text[0] = (char)event.key;
+                key_text[1] = '\0';
+            } else if (event.key == 0x0Au) {
+                key_text[0] = '\n';
+                key_text[1] = '\0';
+            } else if (event.key == 0x08u) {
+                key_text[0] = '\b';
+                key_text[1] = '\0';
+            } else {
+                snprintf(key_text, sizeof(key_text), "[%02X]", event.key);
+            }
+            picopen_terminal_write(key_text);
+            picopen_terminal_render();
+            printf("key: 0x%02x state=%u\r\n", event.key, event.state);
+        }
+        static uint64_t next_heartbeat_ms = 0u;
+        const uint64_t now_ms = time_us_64() / 1000u;
+        if (now_ms >= next_heartbeat_ms) {
+            printf("os-heartbeat: %llu ms\r\n", now_ms);
+            next_heartbeat_ms = now_ms + 5000u;
+        }
+        sleep_ms(4u);
     }
 }

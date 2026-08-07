@@ -106,7 +106,21 @@ identity, while invalid images enter a recoverable state.
     - [x] Verify the terminal diagnostic on the physical CPI 2.0 display
       - Hardware evidence: all expected boot-console lines rendered legibly,
         correctly oriented, and within the 320 x 320 panel bounds.
-- [ ] Keyboard input and power events
+- [x] Keyboard input and power events
+  - [x] Add bounded I2C1 identity and FIFO reads with 20 ms timeouts
+    - Probe the read-only version register at 10, 100, then 400 kHz because
+      official ClockworkPi applications use both ends of that range.
+    - On a NACK, report idle SDA/SCL levels and perform one bounded read-only
+      scan of non-reserved 7-bit addresses; do not issue controller commands.
+  - [x] Keep backlight, reset, and power-off registers write-disabled
+  - [x] Echo pressed printable keys and identify special keys on the terminal
+  - [x] Verify controller firmware identity and key events on hardware
+    - Hardware evidence: after restoring the official ClockworkPi keyboard
+      BIOS v1.6, the controller acknowledged on I2C1 and physical key presses
+      rendered correctly in the PicoPen terminal.
+    - Recovery evidence: the pre-recovery bus was electrically idle
+      (`SDA=1`, `SCL=1`) with no responding 7-bit address, distinguishing a
+      stopped controller from a Pico-side pin or protocol failure.
 - [ ] SD read-only operation, then safe writes
 - [ ] Battery status and controlled shutdown
 - [ ] PSRAM test and allocator

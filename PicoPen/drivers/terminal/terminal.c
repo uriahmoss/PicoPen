@@ -25,6 +25,9 @@ typedef struct terminal_cell {
 static terminal_cell_t cells[TERMINAL_ROWS][TERMINAL_COLUMNS];
 static uint8_t cursor_column;
 static uint8_t cursor_row;
+static uint8_t rendered_cursor_column;
+static uint8_t rendered_cursor_row;
+static bool rendered_cursor_valid;
 
 static const uint8_t glyphs[64][GLYPH_HEIGHT] = {
     ['!'-' '] = {4, 4, 4, 4, 4, 0, 4},
@@ -146,6 +149,7 @@ void picopen_terminal_init(void) {
     }
     cursor_column = 0u;
     cursor_row = 0u;
+    rendered_cursor_valid = false;
 }
 
 void picopen_terminal_write(const char *text) {
@@ -161,6 +165,14 @@ void picopen_terminal_write(const char *text) {
             cursor_column = 0u;
             continue;
         }
+        if (*text == '\b') {
+            if (cursor_column != 0u) {
+                --cursor_column;
+                cells[cursor_row][cursor_column].character = ' ';
+                cells[cursor_row][cursor_column].dirty = true;
+            }
+            continue;
+        }
         if ((*text < ' ') || (*text > '~')) {
             continue;
         }
@@ -174,6 +186,11 @@ void picopen_terminal_write(const char *text) {
 }
 
 void picopen_terminal_render(void) {
+    if (rendered_cursor_valid &&
+        ((rendered_cursor_column != cursor_column) ||
+         (rendered_cursor_row != cursor_row))) {
+        cells[rendered_cursor_row][rendered_cursor_column].dirty = true;
+    }
     for (uint8_t row = 0u; row < TERMINAL_ROWS; ++row) {
         for (uint8_t column = 0u; column < TERMINAL_COLUMNS; ++column) {
             if (cells[row][column].dirty) {
@@ -185,4 +202,7 @@ void picopen_terminal_render(void) {
     picopen_display_fill_rect((uint16_t)cursor_column * CELL_WIDTH,
         (uint16_t)(cursor_row + 1u) * CELL_HEIGHT - 2u,
         CELL_WIDTH - 1u, 2u, COLOR_CURSOR);
+    rendered_cursor_column = cursor_column;
+    rendered_cursor_row = cursor_row;
+    rendered_cursor_valid = true;
 }

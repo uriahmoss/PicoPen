@@ -1,5 +1,6 @@
 add_executable(picopen_os
     ../drivers/display/display.c
+    ../drivers/keyboard/keyboard.c
     ../drivers/terminal/terminal.c
     src/main.c
 )
@@ -10,12 +11,14 @@ picopen_configure_firmware_target(picopen_os
 picopen_set_flash_region(picopen_os 0x10051000 0x001BF000)
 target_link_libraries(picopen_os PRIVATE
     hardware_spi
+    hardware_i2c
     hardware_resets
     picopen_boot_metadata
 )
 target_include_directories(picopen_os PRIVATE
     ${PROJECT_SOURCE_DIR}/boards/picocalc_pico2w/include
     ${PROJECT_SOURCE_DIR}/drivers/display/include
+    ${PROJECT_SOURCE_DIR}/drivers/keyboard/include
     ${PROJECT_SOURCE_DIR}/drivers/terminal/include
 )
 target_compile_definitions(picopen_os PRIVATE
