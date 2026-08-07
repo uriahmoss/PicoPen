@@ -10,10 +10,25 @@
 - PicoCalc I2C keyboard/power controller
 - PicoCalc SPI SD card
 
-Pin assignments are deliberately omitted until they are transcribed from the
-official schematic and checked against an assembled unit. A wrong pin assignment
-can contend with the display, SD card, audio, keyboard controller, or power
-management circuitry.
+The display and keyboard pin map is transcribed from ClockworkPi's official
+V2.0 schematic and reference firmware. The assembled unit was physically
+confirmed by its `CPI 2.0` mainboard marking before GPIO driver work began.
+
+| Function | RP2350 resource | GPIO | Verification |
+|---|---|---:|---|
+| Keyboard SDA | I2C1 SDA | 6 | schematic + official code + CPI 2.0 unit |
+| Keyboard SCL | I2C1 SCL | 7 | schematic + official code + CPI 2.0 unit |
+| Display SCK | SPI1 SCK | 10 | schematic + official code + CPI 2.0 unit |
+| Display MOSI | SPI1 TX | 11 | schematic + official code + CPI 2.0 unit |
+| Display MISO | SPI1 RX | 12 | schematic + official code + CPI 2.0 unit |
+| Display CS | GPIO output | 13 | schematic + official code + CPI 2.0 unit |
+| Display D/C | GPIO output | 14 | schematic + official code + CPI 2.0 unit |
+| Display reset | GPIO output | 15 | schematic + official code + CPI 2.0 unit |
+
+The keyboard/power controller uses address `0x1F`. Bus speed and controller
+protocol will be fixed only after the official keyboard firmware version on the
+assembled unit is identified. SD, audio, PSRAM, and expansion pins remain
+inactive and are not yet accepted into the PicoPen board contract.
 
 ## Bring-up order
 

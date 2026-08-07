@@ -88,6 +88,11 @@ identity, while invalid images enter a recoverable state.
 
 ## Milestone 2: PicoCalc bring-up
 
+- [x] **Slice 2A:** Verify the PicoCalc V2.0 board contract
+  - [x] Pin the official schematic and reference-firmware revision
+  - [x] Transcribe and cross-check display and keyboard pin assignments
+  - [x] Centralize the draft pins without activating GPIO
+  - [x] Confirm `CPI 2.0` on the physical mainboard marking
 - [ ] Display diagnostic pattern and terminal renderer
 - [ ] Keyboard input and power events
 - [ ] SD read-only operation, then safe writes
