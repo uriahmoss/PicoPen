@@ -110,7 +110,11 @@ can be irreversible.
 
 ## Next step
 
-After this diagnostic works on the loose Pico 2 W and again while installed in
-the PicoCalc, implement the stage-1 image manifest and serial recovery console.
-Display, keyboard, SD, and PSRAM drivers follow only after the board pin map is
-verified.
+The stage-1 bootloader and manifested OS artifacts now build independently, but
+the bootloader deliberately does not enter the OS until Slice 1D. Continue using
+`picopen_bringup.uf2` on hardware for now. Do not flash `picopen_bootloader.uf2`,
+`picopen_os.uf2`, or `picopen_os_slot.uf2` expecting a working boot chain.
+
+The next implementation step is the reviewed RP2350 handoff from a validated
+image. Display, keyboard, SD, and PSRAM drivers follow only after the boot chain
+and board pin map are verified.

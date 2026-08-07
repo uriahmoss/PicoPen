@@ -46,6 +46,10 @@ Each image will carry:
 Development mode accepts locally built unsigned images only when a physical
 presence condition is satisfied. Production mode accepts signed images.
 
+Slice 1C implements the development subset: deterministic manifest packaging,
+canonical-field and bounds validation, and hardware SHA-256 verification. It
+does not yet implement production signatures or transfer control to an image.
+
 ## Boot flow
 
 1. Initialize only the clocks and state required for validation.

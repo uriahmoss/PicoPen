@@ -50,6 +50,8 @@ include(${PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 
 project(picopen VERSION 0.0.1 LANGUAGES C CXX ASM)
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)

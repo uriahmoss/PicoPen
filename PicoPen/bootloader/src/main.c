@@ -5,6 +5,7 @@
 #include "pico/stdlib.h"
 
 #include "picopen/boot_format.h"
+#include "picopen/image_validator.h"
 
 #ifndef PICOPEN_VERSION
 #define PICOPEN_VERSION "unknown"
@@ -19,8 +20,11 @@ int main(void) {
     printf("flash-region: 0x%08lx + 0x%08lx\r\n",
            (unsigned long)(PICOPEN_FLASH_BASE + PICOPEN_BOOTLOADER_OFFSET),
            (unsigned long)PICOPEN_BOOTLOADER_SIZE);
-    printf("status: recovery skeleton; OS validation is not implemented\r\n");
-    printf("safety: remaining in bootloader; no OS transfer attempted\r\n");
+    const picopen_image_status_t image_status =
+        picopen_validate_primary_image();
+    printf("primary-image: %s\r\n",
+           picopen_image_status_string(image_status));
+    printf("safety: validation only; no OS transfer attempted\r\n");
     printf("commands: bootsel\r\nbootloader> ");
     fflush(stdout);
 

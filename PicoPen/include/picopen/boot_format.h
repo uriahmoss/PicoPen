@@ -28,11 +28,14 @@
     (PICOPEN_IMAGE_SLOT_SIZE - PICOPEN_IMAGE_PAYLOAD_OFFSET)
 
 #define PICOPEN_IMAGE_FORMAT_VERSION       UINT16_C(1)
+#define PICOPEN_BOOTLOADER_FORMAT_VERSION  UINT32_C(1)
 #define PICOPEN_IMAGE_MAGIC_BYTES          {'P','I','C','O','P','E','N','\0'}
 #define PICOPEN_TARGET_PICO2_W             UINT32_C(0x50325700)
 #define PICOPEN_DIGEST_SHA256              UINT16_C(1)
 #define PICOPEN_SIGNATURE_NONE             UINT16_C(0)
 #define PICOPEN_SIGNATURE_ED25519           UINT16_C(1)
+#define PICOPEN_IMAGE_FLAG_DEVELOPMENT      UINT32_C(0x00000001)
+#define PICOPEN_IMAGE_KNOWN_FLAGS            PICOPEN_IMAGE_FLAG_DEVELOPMENT
 
 typedef struct __attribute__((packed)) picopen_image_header_v1 {
     uint8_t magic[8];

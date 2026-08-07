@@ -26,7 +26,14 @@
   - [x] Produce independent ELF, BIN, HEX, map, disassembly, and UF2 artifacts
   - [x] Verify the OS UF2 block range remains inside its contracted slot
   - [x] Preserve the existing `picopen_bringup` target
-- [ ] **Slice 1C:** Validate the OS header, bounds, and SHA-256 digest
+- [x] **Slice 1C:** Validate the OS header, bounds, and SHA-256 digest
+  - [x] Generate a deterministic manifest-wrapped development image
+  - [x] Package a complete primary-slot UF2 at the contracted address
+  - [x] Reject malformed identity, flags, policy, and noncanonical fields
+  - [x] Reject incompatible versions and all out-of-slot bounds
+  - [x] Validate the payload with RP2350 hardware SHA-256
+  - [x] Report validation status without transferring control
+  - [x] Test valid packaging, corruption, overflow, and forged header CRC
 - [ ] **Slice 1D:** Transfer control to the validated minimal OS
 - [ ] **Slice 1E:** Add watchdog, boot attempts, and boot-success handshake
 - [ ] **Slice 1F:** Finalize recovery behavior and reproducible UF2 artifacts
