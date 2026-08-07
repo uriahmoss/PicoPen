@@ -10,6 +10,7 @@
 
 #include "picopen/boot_format.h"
 #include "picopen/boot_metadata.h"
+#include "picopen/display.h"
 
 #ifndef PICOPEN_VERSION
 #define PICOPEN_VERSION "unknown"
@@ -69,6 +70,12 @@ int main(void) {
     printf("status: minimal OS running\r\n");
     printf("boot-success: confirmed; attempts reset to 0/%u\r\n",
            PICOPEN_BOOT_MAX_ATTEMPTS);
+    const bool display_ready = picopen_display_init();
+    if (display_ready) {
+        picopen_display_draw_diagnostic();
+    }
+    printf("display: %s\r\n",
+           display_ready ? "synthwave diagnostic rendered" : "unavailable");
 
     for (;;) {
         printf("os-heartbeat: %llu ms\r\n", time_us_64() / 1000u);

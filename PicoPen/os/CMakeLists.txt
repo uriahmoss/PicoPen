@@ -1,4 +1,5 @@
 add_executable(picopen_os
+    ../drivers/display/display.c
     src/main.c
 )
 
@@ -7,8 +8,13 @@ picopen_configure_firmware_target(picopen_os
     "PicoPen minimal OS image skeleton")
 picopen_set_flash_region(picopen_os 0x10051000 0x001BF000)
 target_link_libraries(picopen_os PRIVATE
+    hardware_spi
     hardware_resets
     picopen_boot_metadata
+)
+target_include_directories(picopen_os PRIVATE
+    ${PROJECT_SOURCE_DIR}/boards/picocalc_pico2w/include
+    ${PROJECT_SOURCE_DIR}/drivers/display/include
 )
 target_compile_definitions(picopen_os PRIVATE
     PICO_CRT0_INCLUDE_PICOBIN_ENTRY_POINT_ITEM=1

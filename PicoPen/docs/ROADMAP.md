@@ -94,6 +94,12 @@ identity, while invalid images enter a recoverable state.
   - [x] Centralize the draft pins without activating GPIO
   - [x] Confirm `CPI 2.0` on the physical mainboard marking
 - [ ] Display diagnostic pattern and terminal renderer
+  - [x] Add a bounded blocking SPI1 display driver using the verified pins
+  - [x] Add a fixed synthwave color-band and alignment-grid diagnostic
+  - [x] Verify the diagnostic pattern on the physical CPI 2.0 display
+    - Hardware evidence: all synthwave color bands and the gold alignment grid
+      rendered correctly across the installed 320 x 320 panel.
+  - [ ] Add the terminal glyph renderer and bounded dirty-region updates
 - [ ] Keyboard input and power events
 - [ ] SD read-only operation, then safe writes
 - [ ] Battery status and controlled shutdown

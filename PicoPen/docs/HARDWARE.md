@@ -30,6 +30,14 @@ protocol will be fixed only after the official keyboard firmware version on the
 assembled unit is identified. SD, audio, PSRAM, and expansion pins remain
 inactive and are not yet accepted into the PicoPen board contract.
 
+## Display acceptance
+
+The CPI 2.0 unit successfully rendered the complete 320 x 320 synthwave
+diagnostic using SPI1, RGB666 transfers, and the verified GPIO 10-15 mapping.
+Color bands and the 40-pixel alignment grid were visually correct. This accepts
+the blocking display transport for bring-up; framebuffer ownership, terminal
+glyphs, DMA, and partial redraw scheduling remain separate work.
+
 ## Bring-up order
 
 1. SWD and serial logging
