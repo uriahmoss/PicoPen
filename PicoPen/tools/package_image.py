@@ -96,7 +96,9 @@ def main() -> None:
     args = parser.parse_args()
 
     payload = args.bin.read_bytes()
-    provenance = hashlib.sha256(args.elf.read_bytes()).digest()
+    # ELF debug and symbol data may contain an absolute build-directory path.
+    # The flashable payload is the canonical executable build product.
+    provenance = hashlib.sha256(payload).digest()
     image = build_image(payload, elf_entry(args.elf), provenance,
                         args.version, args.build_number)
     args.output.write_bytes(image)

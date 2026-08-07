@@ -19,7 +19,8 @@ picopen_add_relocated_outputs(picopen_os 0x10051000)
 
 set(PICOPEN_OS_IMAGE "${CMAKE_CURRENT_BINARY_DIR}/picopen_os.pimg")
 set(PICOPEN_OS_SLOT_UF2 "${CMAKE_CURRENT_BINARY_DIR}/picopen_os_slot.uf2")
-add_custom_command(TARGET picopen_os POST_BUILD
+add_custom_command(
+    OUTPUT "${PICOPEN_OS_IMAGE}" "${PICOPEN_OS_SLOT_UF2}"
     COMMAND "${Python3_EXECUTABLE}"
         "${PROJECT_SOURCE_DIR}/tools/package_image.py"
         --bin "${CMAKE_CURRENT_BINARY_DIR}/picopen_os.bin"
@@ -33,6 +34,7 @@ add_custom_command(TARGET picopen_os POST_BUILD
         --offset 0x10050000
         --family rp2350-arm-s
         --abs-block
-    BYPRODUCTS "${PICOPEN_OS_IMAGE}" "${PICOPEN_OS_SLOT_UF2}"
+    DEPENDS picopen_os "${PROJECT_SOURCE_DIR}/tools/package_image.py"
     VERBATIM
 )
+add_custom_target(picopen_os_slot ALL DEPENDS "${PICOPEN_OS_SLOT_UF2}")

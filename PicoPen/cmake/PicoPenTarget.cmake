@@ -24,6 +24,7 @@ function(picopen_configure_firmware_target TARGET DISPLAY_NAME DESCRIPTION)
     target_compile_definitions(${TARGET} PRIVATE
         PICOPEN_VERSION="${PROJECT_VERSION}"
         PICOPEN_BUILD_TYPE="$<CONFIG>"
+        PICO_NO_BI_PROGRAM_BUILD_DATE=1
     )
     target_compile_options(${TARGET} PRIVATE -Wall -Wextra)
     target_link_libraries(${TARGET} PRIVATE pico_stdlib hardware_watchdog)

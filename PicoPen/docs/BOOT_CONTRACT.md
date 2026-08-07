@@ -76,6 +76,11 @@ brought up. Such builds must identify themselves as development builds in the
 console and later UI. Enabling unsigned images in a production build will
 require a physical-presence mechanism; that mechanism is not yet selected.
 
+For development artifacts, build provenance is the SHA-256 digest of the
+canonical flashable payload. ELF files are deliberately excluded because debug
+metadata can contain an absolute build-directory path. Production source and
+builder attestations remain part of the later signing-policy work.
+
 ## Transfer contract
 
 Before entering a validated OS, the bootloader will eventually:

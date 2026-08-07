@@ -66,7 +66,14 @@
     - Hardware evidence: the OS confirmed a primary-slot boot and continued
       heartbeats; three power-cycled USB-unavailable attempts entered recovery
       at `3/3`, and `retry` restored a successful validated boot.
-- [ ] **Slice 1F:** Finalize recovery behavior and reproducible UF2 artifacts
+- [x] **Slice 1F:** Finalize recovery behavior and reproducible UF2 artifacts
+  - [x] Remove the nondeterministic SDK build-date record from firmware
+  - [x] Add UF2 structure, RP2350 metadata/family, and region verification
+  - [x] Prove byte-identical clean release builds
+    - Two independent Release directories produced identical bootloader,
+      bring-up, raw OS, and manifested OS-slot UF2 SHA-256 hashes.
+  - [x] Record final recovery acceptance evidence and artifact hashes
+    - See [MILESTONE_1_EVIDENCE.md](MILESTONE_1_EVIDENCE.md).
 - [x] Establish USB serial logging
 - [x] Record reset reason
 - [x] Add the initial USB recovery console

@@ -34,6 +34,13 @@ class PackageImageTests(unittest.TestCase):
             self.packed[:image.HEADER_SIZE - 4]) & 0xFFFFFFFF)
         self.assertEqual(header[18], hashlib.sha256(self.payload).digest())
 
+    def test_reproducible_payload_provenance(self):
+        provenance = hashlib.sha256(self.payload).digest()
+        packed = image.build_image(
+            self.payload, image.PAYLOAD_ADDRESS + 4, provenance, (0, 0, 1), 1)
+        header = struct.unpack(image.FORMAT, packed[:image.HEADER_SIZE])
+        self.assertEqual(header[20], provenance)
+
     def test_rejects_empty_and_oversized_payloads(self):
         with self.assertRaises(ValueError):
             image.build_image(b"", image.PAYLOAD_ADDRESS, bytes(32), (0, 0, 1), 1)
