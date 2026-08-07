@@ -20,9 +20,11 @@ target_compile_options(picopen_bringup PRIVATE
 
 target_link_libraries(picopen_bringup PRIVATE
     pico_stdlib
-    pico_cyw43_arch_none
     hardware_watchdog
 )
+
+# The recovery image must never overlap boot metadata at flash offset 0x40000.
+picopen_set_flash_region(picopen_bringup 0x10000000 0x00040000)
 
 # USB stdio gives the untouched-board image a console without assigning any
 # PicoCalc peripheral GPIO. UART remains off until the PicoCalc routing and DIP

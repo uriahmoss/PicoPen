@@ -34,12 +34,33 @@
   - [x] Validate the payload with RP2350 hardware SHA-256
   - [x] Report validation status without transferring control
   - [x] Test valid packaging, corruption, overflow, and forged header CRC
-- [ ] **Slice 1D:** Transfer control to the validated minimal OS
+- [x] **Slice 1D:** Transfer control to the validated minimal OS
+  - [x] Restrict the ROM chain window to the SHA-256-validated payload
+  - [x] Test and reject RP2350 ROM chaining for the partitionless slot format
+  - [x] Implement bounded Cortex-M33 vector-table handoff
+  - [x] Confirm the SDK `IMAGE_DEF` lies in the first 4 KiB of the payload
+  - [x] Declare the relocated OS vector table in its RP2350 `IMAGE_DEF`
+  - [x] Preserve recovery mode if validation or ROM chaining fails
+  - [x] Report the chained-boot flag from the minimal OS
+  - [x] Build the bootloader, manifested slot image, and legacy bring-up image
+  - [x] Pass host packaging and malformed-image tests
+  - [x] Keep USB uninitialized before ROM chaining so the OS owns USB cleanly
+  - [x] Use a watchdog-scratch handshake for clean warm ROM BOOTSEL entry
+  - [x] Verify warm ROM BOOTSEL entry on the physical Pico 2 W
+  - [x] Add bounded handoff watchdog and recovery checkpoint reporting
+  - [x] Reset USBCTRL before the chained OS initializes TinyUSB
+  - [x] Verify bootloader-to-OS transfer on the physical Pico 2 W
+    - Hardware evidence: the primary-slot OS printed version `0.0.1`, linked
+      address `0x10051000`, and a live heartbeat after validated transfer.
 - [ ] **Slice 1E:** Add watchdog, boot attempts, and boot-success handshake
 - [ ] **Slice 1F:** Finalize recovery behavior and reproducible UF2 artifacts
 - [x] Establish USB serial logging
 - [x] Record reset reason
 - [x] Add the initial USB recovery console
+- [x] Harden bring-up recovery to fit entirely inside the 256 KiB boot region
+  - [x] Remove CYW43 firmware and onboard LED commands from recovery
+  - [x] Enforce the recovery flash boundary in the linker
+  - [x] Add a two-reset watchdog-scratch path for warm BOOTSEL entry
 - [ ] Establish SWD debugging
 
 Exit condition: the bootloader validates and starts an OS that prints its build

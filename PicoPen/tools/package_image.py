@@ -30,7 +30,7 @@ def elf_entry(path: pathlib.Path) -> int:
 
 def build_image(payload: bytes, entry_address: int, provenance: bytes,
                 version: tuple[int, int, int], build_number: int) -> bytes:
-    if not payload or len(payload) > MAX_PAYLOAD_SIZE:
+    if not payload or len(payload) > MAX_PAYLOAD_SIZE or len(payload) % 4:
         raise ValueError("payload size is outside the primary image slot")
     entry_offset = entry_address - PAYLOAD_ADDRESS
     if entry_offset < 0 or entry_offset >= len(payload):
@@ -63,7 +63,7 @@ def validate_image(blob: bytes) -> None:
     if fields[4] != TARGET_PICO2_W or fields[3] & ~FLAG_DEVELOPMENT:
         raise ValueError("unsupported target or flags")
     image_size, payload_offset, entry_offset, vector_offset = fields[5:9]
-    if (image_size == 0 or image_size > MAX_PAYLOAD_SIZE or
+    if (image_size == 0 or image_size > MAX_PAYLOAD_SIZE or image_size % 4 or
             payload_offset != MANIFEST_SIZE or entry_offset >= image_size or
             vector_offset >= image_size or len(blob) != MANIFEST_SIZE + image_size):
         raise ValueError("invalid image bounds")

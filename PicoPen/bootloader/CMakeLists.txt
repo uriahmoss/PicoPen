@@ -1,4 +1,5 @@
 add_executable(picopen_bootloader
+    src/handoff.c
     src/image_validator.c
     src/main.c
 )

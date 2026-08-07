@@ -86,8 +86,13 @@ Before entering a validated OS, the bootloader will eventually:
 - set the vector table and stack according to the validated image
 - branch only to the validated entry offset
 
-Exact RP2350 handoff mechanics belong to Slice 1D and are not implemented by
-this specification slice.
+RP2350 `rom_chain_image()` was evaluated first, but physical tests showed it did
+not launch the custom partitionless slot. Slice 1D therefore uses a direct
+secure Cortex-M33 vector handoff after PicoPen validation. The bootloader checks
+the initial stack alignment and SRAM range plus the Thumb reset vector and its
+payload bounds. It then disables and clears NVIC interrupts, stops SysTick, sets
+VTOR, sets MSP/MSPLIM, and branches to the validated reset handler. A watchdog
+returns to recovery if the OS does not confirm startup.
 
 ## Build artifacts
 
@@ -119,4 +124,5 @@ defined in Slice 1E.
 - Both OS slots are equal-sized and keep manifests separate from payload data.
 - The v1 header has a compile-time-enforced size of exactly 256 bytes.
 - Validation and recovery behavior are specified before parser implementation.
-- Existing bring-up firmware behavior remains unchanged.
+- The original bring-up behavior remained unchanged for Slice 1A; later
+  recovery hardening removed CYW43 so the image fits entirely in stage-1 flash.

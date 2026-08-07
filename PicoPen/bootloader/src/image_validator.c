@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "pico/sha256.h"
+#include "hardware/regs/addressmap.h"
 
 #include "picopen/boot_format.h"
 
@@ -59,6 +60,7 @@ static picopen_image_status_t validate_header(
     }
     if ((header->image_size == 0u) ||
         (header->image_size > PICOPEN_IMAGE_MAX_PAYLOAD_SIZE) ||
+        ((header->image_size & 3u) != 0u) ||
         (header->payload_offset != PICOPEN_IMAGE_PAYLOAD_OFFSET) ||
         (header->entry_offset >= header->image_size) ||
         (header->vector_offset >= header->image_size)) {
@@ -80,7 +82,8 @@ static picopen_image_status_t validate_header(
     return PICOPEN_IMAGE_OK;
 }
 
-picopen_image_status_t picopen_validate_primary_image(void) {
+picopen_image_status_t picopen_validate_primary_image(
+    picopen_validated_image_t *validated) {
     const uintptr_t slot_address =
         PICOPEN_FLASH_BASE + PICOPEN_PRIMARY_SLOT_OFFSET;
     const uint8_t *const slot = (const uint8_t *)slot_address;
@@ -88,7 +91,8 @@ picopen_image_status_t picopen_validate_primary_image(void) {
     sha256_result_t calculated;
     pico_sha256_state_t sha_state;
 
-    if ((PICOPEN_PRIMARY_SLOT_OFFSET % PICOPEN_FLASH_ERASE_SIZE) != 0u) {
+    if ((validated == NULL) ||
+        ((PICOPEN_PRIMARY_SLOT_OFFSET % PICOPEN_FLASH_ERASE_SIZE) != 0u)) {
         return PICOPEN_IMAGE_BAD_SLOT;
     }
 
@@ -108,6 +112,27 @@ picopen_image_status_t picopen_validate_primary_image(void) {
     if (memcmp(calculated.bytes, header.digest, sizeof(header.digest)) != 0) {
         return PICOPEN_IMAGE_BAD_DIGEST;
     }
+
+    uint32_t initial_stack;
+    uint32_t reset_handler;
+    const uint8_t *const vectors =
+        slot + header.payload_offset + header.vector_offset;
+    memcpy(&initial_stack, vectors, sizeof(initial_stack));
+    memcpy(&reset_handler, vectors + sizeof(initial_stack),
+           sizeof(reset_handler));
+    const uintptr_t payload_start = slot_address + header.payload_offset;
+    const uintptr_t payload_end = payload_start + header.image_size;
+    if ((initial_stack < SRAM_BASE) || (initial_stack > SRAM_END) ||
+        ((initial_stack & 7u) != 0u) || ((reset_handler & 1u) == 0u) ||
+        ((reset_handler & ~UINT32_C(1)) < payload_start) ||
+        ((reset_handler & ~UINT32_C(1)) >= payload_end)) {
+        return PICOPEN_IMAGE_BAD_BOUNDS;
+    }
+
+    validated->region_base = (uint32_t)payload_start;
+    validated->region_size = header.image_size;
+    validated->entry_address = reset_handler;
+    validated->vector_address = validated->region_base + header.vector_offset;
     return PICOPEN_IMAGE_OK;
 }
 

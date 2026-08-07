@@ -37,6 +37,17 @@
 #define PICOPEN_IMAGE_FLAG_DEVELOPMENT      UINT32_C(0x00000001)
 #define PICOPEN_IMAGE_KNOWN_FLAGS            PICOPEN_IMAGE_FLAG_DEVELOPMENT
 
+// Watchdog scratch request used to enter ROM BOOTSEL after a clean hardware
+// reset, before firmware initializes USB.
+#define PICOPEN_BOOTSEL_REQUEST_MAGIC        UINT32_C(0x50424F54)
+#define PICOPEN_BOOTSEL_REQUEST_SCRATCH      0u
+#define PICOPEN_BOOT_ATTEMPT_SCRATCH         1u
+#define PICOPEN_BOOT_ATTEMPT_CHAINING        UINT32_C(0x5043484E)
+#define PICOPEN_BOOT_ATTEMPT_OS_ENTERED      UINT32_C(0x504F5345)
+#define PICOPEN_BOOT_ATTEMPT_USB_TIMEOUT     UINT32_C(0x50555342)
+#define PICOPEN_BOOT_ATTEMPT_TIMEOUT_MS      20000u
+#define PICOPEN_OS_USB_WAIT_MS               15000u
+
 typedef struct __attribute__((packed)) picopen_image_header_v1 {
     uint8_t magic[8];
     uint16_t format_version;

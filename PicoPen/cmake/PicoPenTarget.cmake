@@ -53,6 +53,7 @@ function(picopen_add_relocated_outputs TARGET FLASH_ORIGIN)
             "${CMAKE_CURRENT_BINARY_DIR}/${TARGET}.uf2" -t uf2
             --offset ${FLASH_ORIGIN}
             --family rp2350-arm-s
+            --abs-block
         BYPRODUCTS "${CMAKE_CURRENT_BINARY_DIR}/${TARGET}.uf2"
         VERBATIM
     )

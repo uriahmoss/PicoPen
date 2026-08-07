@@ -15,6 +15,11 @@ class PackageImageTests(unittest.TestCase):
         self.packed = image.build_image(
             self.payload, image.PAYLOAD_ADDRESS + 4, bytes(32), (0, 0, 1), 1)
 
+    def test_rejects_unaligned_payload(self):
+        with self.assertRaises(ValueError):
+            image.build_image(b"123", image.PAYLOAD_ADDRESS,
+                              bytes(32), (0, 0, 1), 1)
+
     def test_manifest_and_payload(self):
         image.validate_image(self.packed)
         self.assertEqual(len(self.packed), image.MANIFEST_SIZE + len(self.payload))

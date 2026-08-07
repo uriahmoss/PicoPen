@@ -81,8 +81,7 @@ The first image intentionally touches no PicoCalc peripheral GPIO. It:
 
 - initializes USB serial output
 - reports whether the preceding reset was caused by the watchdog
-- initializes the Pico 2 W CYW43 device
-- exposes explicit onboard LED control through the recovery console
+- deliberately leaves CYW43/Wi-Fi and its onboard LED uninitialized
 - prints a heartbeat every five seconds
 - accepts bounded recovery-console commands over USB serial
 
@@ -99,6 +98,9 @@ policy: no PicoCalc GPIO or external transmitter enabled
 Type `help` for the initial commands. The `bootsel` command returns to the ROM
 USB loader without requiring physical access to the BOOTSEL button.
 
+The recovery target is linked into a hard 256 KiB region. A linker overflow is
+a build failure, preventing it from overwriting boot metadata.
+
 ## 6. Recovery
 
 If the image does not start, repeat the BOOTSEL procedure and flash a known-good
@@ -110,11 +112,51 @@ can be irreversible.
 
 ## Next step
 
-The stage-1 bootloader and manifested OS artifacts now build independently, but
-the bootloader deliberately does not enter the OS until Slice 1D. Continue using
-`picopen_bringup.uf2` on hardware for now. Do not flash `picopen_bootloader.uf2`,
-`picopen_os.uf2`, or `picopen_os_slot.uf2` expecting a working boot chain.
+The stable hardware image remains `picopen_bringup.uf2`. Slice 1D now contains a
+complete candidate bootloader-to-OS handoff, but it remains an acceptance-test
+build until the physical transfer is confirmed using the procedure below. Do
+not flash the raw `picopen_os.uf2`; it does not contain the slot manifest.
 
-The next implementation step is the reviewed RP2350 handoff from a validated
-image. Display, keyboard, SD, and PSRAM drivers follow only after the boot chain
-and board pin map are verified.
+Display, keyboard, SD, and PSRAM drivers follow only after the boot chain and
+board pin map are verified.
+
+## Slice 1D hardware test
+
+Only perform this test with physical access to the Pico 2 W BOOTSEL button and
+a known-good copy of `picopen_bringup.uf2` available.
+
+1. Build the `pico2w-debug` preset and confirm all host tests pass.
+2. Enter ROM BOOTSEL and copy
+   `build/pico2w-debug/os/picopen_os_slot.uf2` first.
+3. The existing bring-up image should still start because this first file only
+   fills the primary OS slot. Use its `bootsel` command to return to ROM BOOTSEL.
+4. Copy `build/pico2w-debug/bootloader/picopen_bootloader.uf2`.
+5. Open USB serial. A successful handoff prints:
+
+```text
+PicoPen minimal OS
+boot-source: PicoPen bootloader / ROM chain
+status: minimal OS running
+```
+
+The OS then prints a heartbeat every five seconds. If validation or ROM chaining
+fails, the bootloader remains at its USB recovery console and accepts `bootsel`.
+If USB recovery is unavailable, use the physical BOOTSEL button and restore
+`picopen_bringup.uf2`.
+
+The candidate handoff is guarded by a 20-second watchdog. The OS resets the USB
+controller and has 15 seconds to enumerate CDC without requiring a terminal to
+open the port. If it cannot, the device
+automatically returns to the bootloader recovery console and reports one of
+`chain-started`, `os-entered`, or `os-usb-timeout` as the last checkpoint.
+If Windows opens the recovered COM port after the initial banner, type `status`
+to print the checkpoint again.
+
+Warm `bootsel` commands record a one-shot request in watchdog scratch memory and
+perform a hardware reset. On the next boot, the request is cleared and ROM
+BOOTSEL is entered before firmware initializes USB. This prevents a live
+TinyUSB CDC instance from being handed directly to the ROM USB stack.
+
+The bootloader deliberately does not initialize USB before a valid handoff.
+This prevents the OS from inheriting an active TinyUSB peripheral instance and
+ensures the chained OS can enumerate its own USB CDC port.
