@@ -63,6 +63,12 @@ pico_sdk_init()
 
 include(cmake/PicoPenTarget.cmake)
 
+add_library(picopen_boot_metadata STATIC src/boot_metadata.c)
+target_include_directories(picopen_boot_metadata PUBLIC
+    ${CMAKE_CURRENT_LIST_DIR}/include
+)
+target_link_libraries(picopen_boot_metadata PUBLIC hardware_flash)
+
 add_subdirectory(bootloader)
 add_subdirectory(bringup)
 add_subdirectory(os)

@@ -135,8 +135,9 @@ a known-good copy of `picopen_bringup.uf2` available.
 
 ```text
 PicoPen minimal OS
-boot-source: PicoPen bootloader / ROM chain
+boot-source: direct or unknown
 status: minimal OS running
+boot-success: confirmed; attempts reset to 0/3
 ```
 
 The OS then prints a heartbeat every five seconds. If validation or ROM chaining
@@ -160,3 +161,21 @@ TinyUSB CDC instance from being handed directly to the ROM USB stack.
 The bootloader deliberately does not initialize USB before a valid handoff.
 This prevents the OS from inheriting an active TinyUSB peripheral instance and
 ensures the chained OS can enumerate its own USB CDC port.
+
+For the Slice 1E failure-path test, disconnect USB and then power-cycle the
+PicoCalc from its battery power. The power cycle is required because an OS that
+has already confirmed boot intentionally disables the boot watchdog and keeps
+running after USB is removed. Leave USB disconnected during the new OS USB
+wait. The watchdog retries the validated OS up to three times and then exposes
+the bootloader recovery console. After at least 65 seconds, reconnect USB and
+run `status`; it must report `boot-attempts: 3/3`. Flashing the latest OS slot
+and bootloader does not erase boot metadata. Enter `retry` at the recovery
+prompt while the serial terminal is connected; the counter is cleared, the
+device reboots, and the validated OS can confirm the new attempt.
+
+When upgrading from the Slice 1D pair, flash the Slice 1E bootloader **before**
+the Slice 1E OS slot. The new bootloader can launch the older OS while creating
+the initial metadata record. The new OS intentionally refuses to run without a
+pending record, so flashing it first against the older bootloader would create
+a watchdog reboot loop. Use ROM BOOTSEL or `picotool reboot -u -f` between the
+two UF2 copies.

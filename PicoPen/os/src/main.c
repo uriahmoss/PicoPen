@@ -9,6 +9,7 @@
 #include "pico/stdio_usb.h"
 
 #include "picopen/boot_format.h"
+#include "picopen/boot_metadata.h"
 
 #ifndef PICOPEN_VERSION
 #define PICOPEN_VERSION "unknown"
@@ -35,6 +36,21 @@ int main(void) {
         watchdog_reboot(0u, 0u, 0u);
     }
 
+    picopen_boot_metadata_v1_t metadata;
+    if (!picopen_boot_metadata_load(&metadata) ||
+        ((metadata.flags & PICOPEN_BOOT_FLAG_PENDING) == 0u)) {
+        watchdog_hw->scratch[PICOPEN_BOOT_ATTEMPT_SCRATCH] =
+            PICOPEN_BOOT_ATTEMPT_METADATA_ERROR;
+        watchdog_reboot(0u, 0u, 0u);
+    }
+    metadata.flags = PICOPEN_BOOT_FLAG_CONFIRMED;
+    metadata.attempt_count = 0u;
+    metadata.last_failure = 0u;
+    if (!picopen_boot_metadata_store(&metadata)) {
+        watchdog_hw->scratch[PICOPEN_BOOT_ATTEMPT_SCRATCH] =
+            PICOPEN_BOOT_ATTEMPT_METADATA_ERROR;
+        watchdog_reboot(0u, 0u, 0u);
+    }
     watchdog_hw->scratch[PICOPEN_BOOT_ATTEMPT_SCRATCH] = 0u;
     watchdog_disable();
 
@@ -51,6 +67,8 @@ int main(void) {
                ? "PicoPen bootloader / ROM chain"
                : "direct or unknown");
     printf("status: minimal OS running\r\n");
+    printf("boot-success: confirmed; attempts reset to 0/%u\r\n",
+           PICOPEN_BOOT_MAX_ATTEMPTS);
 
     for (;;) {
         printf("os-heartbeat: %llu ms\r\n", time_us_64() / 1000u);

@@ -6,7 +6,10 @@ picopen_configure_firmware_target(picopen_os
     "PicoPen OS"
     "PicoPen minimal OS image skeleton")
 picopen_set_flash_region(picopen_os 0x10051000 0x001BF000)
-target_link_libraries(picopen_os PRIVATE hardware_resets)
+target_link_libraries(picopen_os PRIVATE
+    hardware_resets
+    picopen_boot_metadata
+)
 target_compile_definitions(picopen_os PRIVATE
     PICO_CRT0_INCLUDE_PICOBIN_ENTRY_POINT_ITEM=1
     PICO_CRT0_INCLUDE_PICOBIN_VECTOR_TABLE_ITEM=1

@@ -115,8 +115,26 @@ and validation path; Slice 1D adds controlled transfer from bootloader to OS.
 - Corrupt metadata: select a valid redundant copy; if neither is valid, recover.
 - ROM BOOTSEL remains reachable even if the PicoPen bootloader is damaged.
 
-Boot metadata records, attempt limits, and the boot-success handshake are
-defined in Slice 1E.
+## Boot metadata and success handshake
+
+Slice 1E uses a 256-byte version-1 record at the start of each redundant boot
+metadata sector. A record contains its identity and size, generation, selected
+slot, pending or confirmed state, consecutive attempt count, last failure
+checkpoint, reserved bytes, and CRC-32. Reserved bytes must be zero. The newest
+CRC-valid generation is authoritative; if an erase or program operation is
+interrupted, the older valid copy remains selectable. Generation comparison
+supports 32-bit wraparound.
+
+Before every transfer, stage 1 writes a pending record to the alternate sector
+and increments the consecutive attempt count. The minimal OS writes a confirmed
+record and resets the count only after its core runtime and USB console are
+ready. A missing confirmation causes another validated attempt. Three
+consecutive unconfirmed attempts enter recovery, where the counter and watchdog
+checkpoint are reported. A metadata write or verification failure also enters
+recovery and never transfers control.
+The local recovery-console `retry` command writes a confirmed zero-attempt
+record and reboots. It resets only the lockout; normal image validation still
+runs before any subsequent transfer.
 
 ## Slice 1A acceptance record
 

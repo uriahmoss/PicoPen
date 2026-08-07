@@ -52,7 +52,20 @@
   - [x] Verify bootloader-to-OS transfer on the physical Pico 2 W
     - Hardware evidence: the primary-slot OS printed version `0.0.1`, linked
       address `0x10051000`, and a live heartbeat after validated transfer.
-- [ ] **Slice 1E:** Add watchdog, boot attempts, and boot-success handshake
+- [x] **Slice 1E:** Add watchdog, boot attempts, and boot-success handshake
+  - [x] Accept a three-consecutive-attempt recovery policy
+  - [x] Define a versioned 256-byte metadata record with CRC-32
+  - [x] Select the newest valid A/B generation with wraparound handling
+  - [x] Write the alternate metadata sector and verify it before transfer
+  - [x] Persist a pending attempt before entering the OS
+  - [x] Confirm boot and reset attempts after core runtime and USB are ready
+  - [x] Enter recovery after three unconfirmed attempts or a metadata error
+  - [x] Add a local `retry` command that safely clears an attempt lockout
+  - [x] Pass host tests for corruption, interrupted writes, and generation wrap
+  - [x] Verify success confirmation and three-failure recovery on hardware
+    - Hardware evidence: the OS confirmed a primary-slot boot and continued
+      heartbeats; three power-cycled USB-unavailable attempts entered recovery
+      at `3/3`, and `retry` restored a successful validated boot.
 - [ ] **Slice 1F:** Finalize recovery behavior and reproducible UF2 artifacts
 - [x] Establish USB serial logging
 - [x] Record reset reason

@@ -11,5 +11,8 @@ picopen_set_flash_region(picopen_bootloader 0x10000000 0x00040000)
 target_include_directories(picopen_bootloader PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/include
 )
-target_link_libraries(picopen_bootloader PRIVATE pico_sha256)
+target_link_libraries(picopen_bootloader PRIVATE
+    pico_sha256
+    picopen_boot_metadata
+)
 pico_add_extra_outputs(picopen_bootloader)
