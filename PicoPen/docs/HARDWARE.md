@@ -24,10 +24,15 @@ confirmed by its `CPI 2.0` mainboard marking before GPIO driver work began.
 | Display CS | GPIO output | 13 | schematic + official code + CPI 2.0 unit |
 | Display D/C | GPIO output | 14 | schematic + official code + CPI 2.0 unit |
 | Display reset | GPIO output | 15 | schematic + official code + CPI 2.0 unit |
+| SD MISO | SPI0 RX | 16 | schematic + official code + user-approved contract |
+| SD CS | GPIO output | 17 | schematic + official code + user-approved contract |
+| SD SCK | SPI0 SCK | 18 | schematic + official code + user-approved contract |
+| SD MOSI | SPI0 TX | 19 | schematic + official code + user-approved contract |
 
 The keyboard/power controller uses address `0x1F`. Bus speed and controller
 protocol will be fixed only after the official keyboard firmware version on the
-assembled unit is identified. SD, audio, PSRAM, and expansion pins remain
+assembled unit is identified. The user approved the SD mapping after review of
+the physical Pico pin equivalents. Audio, PSRAM, and expansion pins remain
 inactive and are not yet accepted into the PicoPen board contract.
 
 ## Display acceptance
@@ -43,6 +48,13 @@ boot-console line legibly, with correct orientation and no screen-edge clipping.
 This accepts the initial glyph and dirty-cell path. The current repository-owned
 font intentionally covers boot-console characters; a complete UI font and ANSI
 parser remain later UI work.
+
+## SD acceptance
+
+The CPI 2.0 unit initialized and identified an inserted SD card through SPI0 at
+the SD-mandated low startup clock. This accepts the GPIO 16-19 transport mapping
+for read-only development. The current driver intentionally exposes no block
+write, erase, formatting, or filesystem mutation operation.
 
 ## Bring-up order
 

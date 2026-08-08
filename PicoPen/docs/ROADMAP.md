@@ -122,6 +122,11 @@ identity, while invalid images enter a recoverable state.
       (`SDA=1`, `SCL=1`) with no responding 7-bit address, distinguishing a
       stopped controller from a Pico-side pin or protocol failure.
 - [ ] SD read-only operation, then safe writes
+  - [x] Accept and centralize the CPI 2.0 SPI0 pin contract
+  - [x] Identify an inserted card using bounded, read-only initialization
+    - Block write, erase, formatting, and filesystem operations are absent.
+    - Hardware evidence: the CPI 2.0 unit initialized and identified the
+      inserted card through SPI0; the user accepted the displayed result.
 - [ ] Battery status and controlled shutdown
 - [ ] PSRAM test and allocator
 

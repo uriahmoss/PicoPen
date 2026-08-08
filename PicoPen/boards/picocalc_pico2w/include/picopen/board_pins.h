@@ -20,6 +20,12 @@
 #define PICOPEN_KEYBOARD_SCL_PIN   7u
 #define PICOPEN_KEYBOARD_ADDRESS   UINT8_C(0x1F)
 
+#define PICOPEN_SD_SPI_INDEX 0u
+#define PICOPEN_SD_MISO_PIN  16u
+#define PICOPEN_SD_CS_PIN    17u
+#define PICOPEN_SD_SCK_PIN   18u
+#define PICOPEN_SD_MOSI_PIN  19u
+
 _Static_assert(PICOPEN_DISPLAY_SCK_PIN != PICOPEN_DISPLAY_MOSI_PIN,
                "display pins must be unique");
 _Static_assert(PICOPEN_DISPLAY_MOSI_PIN != PICOPEN_DISPLAY_MISO_PIN,
@@ -32,5 +38,11 @@ _Static_assert(PICOPEN_DISPLAY_DC_PIN != PICOPEN_DISPLAY_RESET_PIN,
                "display pins must be unique");
 _Static_assert(PICOPEN_KEYBOARD_SDA_PIN != PICOPEN_KEYBOARD_SCL_PIN,
                "keyboard pins must be unique");
+_Static_assert(PICOPEN_SD_MISO_PIN != PICOPEN_SD_CS_PIN,
+               "SD pins must be unique");
+_Static_assert(PICOPEN_SD_CS_PIN != PICOPEN_SD_SCK_PIN,
+               "SD pins must be unique");
+_Static_assert(PICOPEN_SD_SCK_PIN != PICOPEN_SD_MOSI_PIN,
+               "SD pins must be unique");
 
 #endif

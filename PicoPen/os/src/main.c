@@ -12,6 +12,7 @@
 #include "picopen/boot_metadata.h"
 #include "picopen/display.h"
 #include "picopen/keyboard.h"
+#include "picopen/sd.h"
 #include "picopen/terminal.h"
 
 #ifndef PICOPEN_VERSION
@@ -75,8 +76,11 @@ int main(void) {
     const bool display_ready = picopen_display_init();
     picopen_keyboard_info_t keyboard_info;
     const bool keyboard_ready = picopen_keyboard_init(&keyboard_info);
+    picopen_sd_info_t sd_info;
+    const bool sd_ready = picopen_sd_identify(&sd_info);
     if (display_ready) {
         char keyboard_status[40];
+        char sd_status[40];
         if (keyboard_ready) {
             snprintf(keyboard_status, sizeof(keyboard_status),
                      "KBD FW: 0X%02X READY %luK\n",
@@ -89,6 +93,16 @@ int main(void) {
                      keyboard_info.scl_high ? 1u : 0u,
                      keyboard_info.found_address);
         }
+        if (sd_ready) {
+            snprintf(sd_status, sizeof(sd_status), "SD: %s V%s OCR:%08lX\n",
+                     sd_info.high_capacity ? "SDHC/XC" : "SDSC",
+                     sd_info.version_2 ? "2" : "1",
+                     (unsigned long)sd_info.ocr);
+        } else {
+            snprintf(sd_status, sizeof(sd_status), "SD: %s R1:%02X\n",
+                     picopen_sd_status_name(sd_info.status),
+                     sd_info.last_response);
+        }
         picopen_terminal_init();
         picopen_terminal_write(
             "PICOPEN TERMINAL 0.0.1\n"
@@ -96,6 +110,7 @@ int main(void) {
             "BOOT: PRIMARY CONFIRMED\n"
             "STATUS: MINIMAL OS RUNNING\n");
         picopen_terminal_write(keyboard_status);
+        picopen_terminal_write(sd_status);
         picopen_terminal_write("\n> ");
         picopen_terminal_render();
     }
@@ -110,6 +125,11 @@ int main(void) {
            keyboard_info.sda_high ? 1u : 0u,
            keyboard_info.scl_high ? 1u : 0u,
            keyboard_info.found_address);
+    printf("sd: %s; type=%s; version=%u; r1=0x%02x; ocr=0x%08lx\r\n",
+           picopen_sd_status_name(sd_info.status),
+           sd_info.high_capacity ? "SDHC/XC" : "SDSC",
+           sd_info.version_2 ? 2u : 1u, sd_info.last_response,
+           (unsigned long)sd_info.ocr);
 
     for (;;) {
         picopen_key_event_t event;

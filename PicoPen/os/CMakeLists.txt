@@ -1,6 +1,7 @@
 add_executable(picopen_os
     ../drivers/display/display.c
     ../drivers/keyboard/keyboard.c
+    ../drivers/sd/sd.c
     ../drivers/terminal/terminal.c
     src/main.c
 )
@@ -19,6 +20,7 @@ target_include_directories(picopen_os PRIVATE
     ${PROJECT_SOURCE_DIR}/boards/picocalc_pico2w/include
     ${PROJECT_SOURCE_DIR}/drivers/display/include
     ${PROJECT_SOURCE_DIR}/drivers/keyboard/include
+    ${PROJECT_SOURCE_DIR}/drivers/sd/include
     ${PROJECT_SOURCE_DIR}/drivers/terminal/include
 )
 target_compile_definitions(picopen_os PRIVATE
