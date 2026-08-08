@@ -28,6 +28,7 @@ confirmed by its `CPI 2.0` mainboard marking before GPIO driver work began.
 | SD CS | GPIO output | 17 | schematic + official code + user-approved contract |
 | SD SCK | SPI0 SCK | 18 | schematic + official code + user-approved contract |
 | SD MOSI | SPI0 TX | 19 | schematic + official code + user-approved contract |
+| SD detect | GPIO input, active low | 22 | schematic + official SD booter |
 
 The keyboard/power controller uses address `0x1F`. Bus speed and controller
 protocol will be fixed only after the official keyboard firmware version on the
@@ -49,12 +50,22 @@ This accepts the initial glyph and dirty-cell path. The current repository-owned
 font intentionally covers boot-console characters; a complete UI font and ANSI
 parser remain later UI work.
 
-## SD acceptance
+## SD bring-up
 
-The CPI 2.0 unit initialized and identified an inserted SD card through SPI0 at
-the SD-mandated low startup clock. This accepts the GPIO 16-19 transport mapping
-for read-only development. The current driver intentionally exposes no block
-write, erase, formatting, or filesystem mutation operation.
+The first physical SPI0 identification attempts returned no response to CMD0
+(`R1=0xFF`) while the STM32 keyboard/power controller was not responding on
+I2C. After recovering the official keyboard BIOS v1.6, PicoPen identified the
+inserted card over hardware SPI as SDHC/SDXC v2 with OCR `0xC0FF8000`. This
+accepts the GPIO 16-19 transport and active-low GPIO 22 card detect on the CPI
+2.0 unit. The current driver intentionally exposes no block write, erase,
+formatting, or filesystem mutation operation.
+
+The V2.0 schematic powers SD VDD from the PMIC-controlled ALDO1 rail rather
+than the Pico's 3V3 output. ClockworkPi's pinned SD booter waits 1.5 seconds
+after active-low card detection before starting SPI; PicoPen mirrors that
+bounded stabilization interval. A detected card with repeated `R1=0xFF` should
+therefore be correlated with keyboard-controller availability before treating
+it as an SPI or card fault, because the controller initializes the board PMIC.
 
 ## Bring-up order
 

@@ -125,8 +125,22 @@ identity, while invalid images enter a recoverable state.
   - [x] Accept and centralize the CPI 2.0 SPI0 pin contract
   - [x] Identify an inserted card using bounded, read-only initialization
     - Block write, erase, formatting, and filesystem operations are absent.
-    - Hardware evidence: the CPI 2.0 unit initialized and identified the
-      inserted card through SPI0; the user accepted the displayed result.
+    - Initial hardware result was `no-response`, `R1=0xFF` while the STM32
+      keyboard/power controller was not responding on I2C and the
+      PMIC-controlled SD supply was unavailable.
+    - Add a bounded mode-0 software-SPI fallback for startup, matching the
+      low-speed approach in ClockworkPi's PicoMite path.
+    - Align card detect, 8 mA output drive, MISO hysteresis, CRC7, response
+      window, and glitch-free CS initialization with ClockworkPi references.
+    - Use a standards-compatible 400 kHz startup clock, selected-card ready
+      wait, and CS-high release clocks consistent with working PicoCalc
+      PicoMite, Picoware, and MicroPython implementations.
+    - Honor the official 1.5-second post-detect stabilization delay for the
+      SD socket's PMIC-controlled ALDO1 supply.
+    - Hardware evidence: after recovering the official keyboard BIOS v1.6 and
+      confirming `KBD FW: 0X16 READY 10K`, PicoPen identified the inserted card
+      over hardware SPI as SDHC/SDXC v2 with card detect active and OCR
+      `0xC0FF8000`.
 - [ ] Battery status and controlled shutdown
 - [ ] PSRAM test and allocator
 

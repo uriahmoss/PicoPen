@@ -16,6 +16,8 @@ typedef struct picopen_sd_info {
     picopen_sd_status_t status;
     bool version_2;
     bool high_capacity;
+    bool software_spi;
+    bool card_detected;
     uint8_t last_response;
     uint32_t ocr;
 } picopen_sd_info_t;

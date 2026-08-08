@@ -25,6 +25,7 @@
 #define PICOPEN_SD_CS_PIN    17u
 #define PICOPEN_SD_SCK_PIN   18u
 #define PICOPEN_SD_MOSI_PIN  19u
+#define PICOPEN_SD_DETECT_PIN 22u
 
 _Static_assert(PICOPEN_DISPLAY_SCK_PIN != PICOPEN_DISPLAY_MOSI_PIN,
                "display pins must be unique");
