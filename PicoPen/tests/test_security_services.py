@@ -59,6 +59,27 @@ class SecurityServiceBaselineTests(unittest.TestCase):
         self.assertIn("text_bytes * 100u", gui)
         self.assertIn("picopen_storage_list_directory", gui)
 
+    def test_passive_workbench_job_is_bounded_and_does_not_touch_hardware(self):
+        header = (ROOT / "services" / "workbench" / "include" / "picopen" /
+                  "workbench.h").read_text(encoding="utf-8")
+        implementation = (ROOT / "services" / "workbench" /
+                          "workbench.c").read_text(encoding="utf-8")
+        gui = (ROOT / "services" / "gui" / "gui.c").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("PICOPEN_WORKBENCH_ABI_VERSION 1u", header)
+        self.assertIn("PICOPEN_WORKBENCH_ITEM_CAPACITY 7u", header)
+        self.assertIn("PICOPEN_WORKBENCH_RUNNING", header)
+        self.assertIn("picopen_workbench_cancel", implementation)
+        self.assertIn("PICOPEN_WORKBENCH_STEP_MS", implementation)
+        for forbidden in ("hardware/gpio.h", "hardware/i2c.h",
+                          "hardware/spi.h", "gpio_put(", "i2c_write",
+                          "spi_write"):
+            self.assertNotIn(forbidden, implementation)
+        self.assertIn("CONFIG/POLICY INVENTORY ONLY", gui)
+        self.assertIn("NO BUS TRAFFIC OR PIN CHANGES", gui)
+        self.assertIn('picopen_audit_record("workbench.start"', gui)
+
     def test_shutdown_requires_explicit_local_confirmation(self):
         capability = (ROOT / "kernel" / "capability.c").read_text(
             encoding="utf-8"

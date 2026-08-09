@@ -30,10 +30,15 @@ review gates and are never implied by acceleration.
     preview, accessibility checks, and safe fallback
 - [ ] **Bundle B: passive security workbench**
   - Engagement-scope editor and persistent scope/security indicators
-  - Receive-only GPIO, ADC, I2C, SPI, UART, and attachment inventory
-  - Bounded jobs, progress, cancellation, errors, and structured audit events
-  - Read-only directory traversal, metadata, text, and hexadecimal viewers
-  - No GPIO drive, target power, emulation, probing, or transmission
+  - [x] Add a no-I/O configuration and policy inventory for GPIO, ADC, I2C,
+    SPI, UART, and attachments; live electrical observation remains deferred
+    until the expansion-pin contract is verified
+  - [x] Add an ABI-versioned fixed-capacity inventory job with progress,
+    cancellation, terminal states, and lifecycle audit events
+  - [x] Add read-only directory traversal, metadata, text, and hexadecimal
+    viewers
+  - [x] Keep GPIO drive, target power, emulation, probing, and transmission
+    absent from this bundle's service
 - [ ] **Bundle C: Wi-Fi and update transport foundation**
   - Wi-Fi disabled by default with locally approved connection management
   - Passive access-point inventory and interface diagnostics

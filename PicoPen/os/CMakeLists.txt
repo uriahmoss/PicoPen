@@ -15,6 +15,7 @@ add_executable(picopen_os
     ../services/appearance/synthwave_renderer.c
     ../services/audit/audit.c
     ../services/device/device.c
+    ../services/workbench/workbench.c
     ../services/policy/engagement.c
     ../third_party/fatfs/ff.c
     src/main.c
@@ -43,6 +44,7 @@ target_include_directories(picopen_os PRIVATE
     ${PROJECT_SOURCE_DIR}/services/appearance/include
     ${PROJECT_SOURCE_DIR}/services/audit/include
     ${PROJECT_SOURCE_DIR}/services/device/include
+    ${PROJECT_SOURCE_DIR}/services/workbench/include
     ${PROJECT_SOURCE_DIR}/services/policy/include
     ${PROJECT_SOURCE_DIR}/third_party/fatfs
 )

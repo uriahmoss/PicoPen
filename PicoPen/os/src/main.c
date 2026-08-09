@@ -24,6 +24,7 @@
 #include "picopen/storage.h"
 #include "picopen/terminal.h"
 #include "picopen/work_queue.h"
+#include "picopen/workbench.h"
 
 #ifndef PICOPEN_VERSION
 #define PICOPEN_VERSION "unknown"
@@ -117,6 +118,7 @@ int main(void) {
     watchdog_disable();
     picopen_audit_init();
     picopen_skin_init();
+    picopen_workbench_init();
 
     printf("\r\nPicoPen minimal OS\r\n");
     printf("version: %s\r\n", PICOPEN_VERSION);
@@ -349,6 +351,16 @@ int main(void) {
             printf("key: 0x%02x state=%u\r\n", event.key, event.state);
         }
         const uint64_t now_ms = time_us_64() / 1000u;
+        if (picopen_workbench_poll(now_ms)) {
+            picopen_workbench_snapshot_t snapshot;
+            picopen_workbench_snapshot(&snapshot);
+            if (snapshot.state == PICOPEN_WORKBENCH_COMPLETE) {
+                picopen_audit_record("workbench.done", true);
+            } else if (snapshot.state == PICOPEN_WORKBENCH_ERROR) {
+                picopen_audit_record("workbench.error", false);
+            }
+            picopen_gui_refresh_workbench();
+        }
         if (now_ms >= next_device_health_ms) {
             bool state_changed = false;
             if (keyboard_ready && !picopen_keyboard_health_check()) {

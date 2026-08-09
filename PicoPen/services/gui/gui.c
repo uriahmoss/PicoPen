@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "pico/stdlib.h"
+
 #include "picopen/audit.h"
 #include "picopen/crayon_renderer.h"
 #include "picopen/display.h"
@@ -12,6 +14,7 @@
 #include "picopen/storage.h"
 #include "picopen/synthwave_renderer.h"
 #include "picopen/terminal.h"
+#include "picopen/workbench.h"
 
 #define GUI_SCREEN_SIZE 1024u
 #define GUI_HOME_ITEMS 6u
@@ -482,9 +485,20 @@ static void render_devices(void) {
 
 static void render_workbench(void) {
     begin("WORKBENCH");
-    append("\nI2C1  KEYBOARD CLAIMED\nSPI0  SD READ-ONLY\n"
-           "SPI1  DISPLAY CLAIMED\n\nGPIO READ       NOT EXPOSED\n"
-           "GPIO DRIVE      DENIED\nTRANSMIT        DENIED\n\nESC BACK\n");
+    picopen_workbench_snapshot_t snapshot;
+    picopen_workbench_snapshot(&snapshot);
+    append("JOB %-9s  %3u%%\n", picopen_workbench_job_state_name(snapshot.state),
+           snapshot.progress_percent);
+    for (size_t index = 0u; index < snapshot.item_count; ++index) {
+        append("%-12s %s\n", snapshot.items[index].name,
+               picopen_workbench_item_state_name(snapshot.items[index].state));
+    }
+    append("\nCONFIG/POLICY INVENTORY ONLY\nNO BUS TRAFFIC OR PIN CHANGES\n");
+    if (snapshot.state == PICOPEN_WORKBENCH_RUNNING) {
+        append("\nESC CANCEL\n");
+    } else {
+        append("\nENTER RUN  ESC BACK\n");
+    }
     present();
 }
 
@@ -685,6 +699,12 @@ void picopen_gui_update_state(const picopen_shell_state_t *state) {
     }
 }
 
+void picopen_gui_refresh_workbench(void) {
+    if (screen == GUI_WORKBENCH) {
+        render_workbench();
+    }
+}
+
 void picopen_gui_handle_key(uint8_t key) {
     if (screen == GUI_TERMINAL) {
         if (key == PICOPEN_KEY_ESCAPE) {
@@ -697,6 +717,16 @@ void picopen_gui_handle_key(uint8_t key) {
         return;
     }
     if (key == PICOPEN_KEY_ESCAPE) {
+        if (screen == GUI_WORKBENCH) {
+            picopen_workbench_snapshot_t snapshot;
+            picopen_workbench_snapshot(&snapshot);
+            if (snapshot.state == PICOPEN_WORKBENCH_RUNNING) {
+                const bool cancelled = picopen_workbench_cancel();
+                picopen_audit_record("workbench.cancel", cancelled);
+                render_workbench();
+                return;
+            }
+        }
         if ((screen == GUI_FILES) && (strcmp(file_path, "/") != 0)) {
             char *const separator = strrchr(file_path, '/');
             if ((separator == NULL) || (separator == file_path)) {
@@ -738,6 +768,15 @@ void picopen_gui_handle_key(uint8_t key) {
         if (key == PICOPEN_KEY_ENTER) { open_home_item(); return; }
         if (selection != previous) {
             redraw_home_focus(previous, selection);
+        }
+        return;
+    }
+    if (screen == GUI_WORKBENCH) {
+        if (key == PICOPEN_KEY_ENTER) {
+            const bool started = picopen_workbench_start(
+                &gui_state.devices, time_us_64() / 1000u);
+            picopen_audit_record("workbench.start", started);
+            render_workbench();
         }
         return;
     }
