@@ -226,9 +226,22 @@ power interruptions without corrupting its boot metadata.
       read-only and the bounded `ls` command listed root entries without
       disrupting keyboard input.
 - [ ] **Slice 3C:** Add the versioned storage service
-  - Separate removable read access, evidence export, and privileged mutation
+  - [x] Add an ABI-versioned removable-read service with media generations,
+    bounded paths, directory depth, entry counts, metadata, and offset reads
+  - [x] Add read-only nested directory traversal plus bounded automatic text
+    and hexadecimal viewing to Files
+  - [x] Add explicit safe-removal, media-change, corrupt-volume, I/O, and limit
+    states without adding any mutation API
+    - Build and host tests pass; physical nested-file and viewer acceptance is
+      deferred until the operator has a supported way to place test files on
+      the SD card. This is provisional acceptance, not hardware evidence.
+  - [ ] Separate evidence export and privileged mutation into independently
+    authorized interfaces; removable read access is now separate
   - Require explicit capability and local policy for every SD write
-  - Add safe-removal, media-change, timeout, and corruption reporting
+  - [ ] Add a user-facing safe-remove action and verify live media-change
+    reporting on hardware
+  - [ ] Add a service-level operation deadline after the timer contract is
+    connected to the block transport
 - [ ] **Slice 3D:** Add pinned littlefs for internal settings and audit journals
   - Keep secrets in a separately designed encrypted vault
   - Test interrupted updates and full-media behavior

@@ -51,6 +51,8 @@ static gui_screen_t screen;
 static size_t selection;
 static size_t home_selection;
 static size_t system_selection;
+static picopen_storage_listing_t file_listing;
+static char file_path[PICOPEN_STORAGE_PATH_SIZE];
 static char canvas[GUI_SCREEN_SIZE];
 static char canvas_title[20];
 static size_t canvas_length;
@@ -390,16 +392,17 @@ static void render_status(void) {
 
 static void render_files(void) {
     begin("FILES");
-    if (!gui_state.storage_ready || (gui_state.storage.count == 0u)) {
-        append("\nNO ROOT FILES FOUND\n\nSD REMAINS READ-ONLY\n\nESC BACK\n");
+    if (!gui_state.storage_ready || (file_listing.count == 0u)) {
+        append("\nNO FILES FOUND\n\nPATH %.30s\nSD REMAINS READ-ONLY\n\nESC BACK\n",
+               file_path);
         present();
         return;
     }
-    append("ROOT /   READ-ONLY\n\n");
-    for (size_t index = 0u; index < gui_state.storage.count; ++index) {
+    append("%.28s   READ-ONLY\n\n", file_path);
+    for (size_t index = 0u; index < file_listing.count; ++index) {
         const picopen_storage_entry_t *const entry =
-            &gui_state.storage.entries[index];
-        append(selection == index ? "> %-12s%s\n" : "  %-12s%s\n",
+            &file_listing.entries[index];
+        append(selection == index ? "> %-24.24s%s\n" : "  %-24.24s%s\n",
                entry->name, entry->directory ? "/" : "");
     }
     append("\nUP/DOWN  ENTER OPEN  ESC BACK\n");
@@ -409,24 +412,54 @@ static void render_files(void) {
 static void render_file(void) {
     begin("FILE VIEW");
     const picopen_storage_entry_t *const entry =
-        &gui_state.storage.entries[selection];
-    append("%s  MAX 256 BYTES\n----------------------------------------\n",
-           entry->name);
+        &file_listing.entries[selection];
+    char path[PICOPEN_STORAGE_PATH_SIZE];
+    const int path_length = snprintf(path, sizeof(path),
+        strcmp(file_path, "/") == 0 ? "/%s" : "%s/%s", file_path,
+        entry->name);
+    append("%.24s  %lu B\n----------------------------------------\n",
+           entry->name, (unsigned long)entry->size);
     uint8_t bytes[PICOPEN_STORAGE_READ_LIMIT];
     size_t bytes_read = 0u;
     bool truncated = false;
     const bool authorized = picopen_security_authorize(
         &gui_state.security, PICOPEN_CAP_STORAGE_READ, false);
     if (!authorized || entry->directory ||
-        !picopen_storage_read_root_file(entry->name, bytes, sizeof(bytes),
-                                        &bytes_read, &truncated)) {
+        (path_length <= 0) || ((size_t)path_length >= sizeof(path)) ||
+        (picopen_storage_read_file(&gui_state.storage_service, path, 0u,
+             bytes, sizeof(bytes), &bytes_read, &truncated) !=
+         PICOPEN_STORAGE_OK)) {
         append("FILE UNAVAILABLE OR DENIED\n");
         picopen_audit_record("gui.file.read", false);
     } else {
+        size_t text_bytes = 0u;
         for (size_t index = 0u; index < bytes_read; ++index) {
             const uint8_t value = bytes[index];
-            append("%c", ((value == '\n') || (value == '\r') ||
-                           ((value >= ' ') && (value <= '~'))) ? value : '.');
+            if ((value == '\n') || (value == '\r') || (value == '\t') ||
+                ((value >= ' ') && (value <= '~'))) {
+                ++text_bytes;
+            }
+        }
+        const bool text_view = (bytes_read == 0u) ||
+            ((text_bytes * 100u) / bytes_read >= 85u);
+        if (text_view) {
+            append("TEXT\n");
+            for (size_t index = 0u; index < bytes_read; ++index) {
+                const uint8_t value = bytes[index];
+                append("%c", ((value == '\n') || (value == '\r') ||
+                               ((value >= ' ') && (value <= '~'))) ? value : '.');
+            }
+        } else {
+            append("HEX (FIRST 96 BYTES)\n");
+            const size_t shown = bytes_read < 96u ? bytes_read : 96u;
+            for (size_t index = 0u; index < shown; index += 8u) {
+                append("%04X ", (unsigned int)index);
+                for (size_t column = 0u;
+                     (column < 8u) && (index + column < shown); ++column) {
+                    append("%02X ", bytes[index + column]);
+                }
+                append("\n");
+            }
         }
         append(truncated ? "\n-- TRUNCATED --\n" : "\n");
         picopen_audit_record("gui.file.read", true);
@@ -604,7 +637,9 @@ static gui_screen_t parent_screen(gui_screen_t current) {
 void picopen_gui_init(const picopen_shell_state_t *state) {
     if (state != NULL) {
         gui_state = *state;
+        file_listing = state->storage;
     }
+    strcpy(file_path, "/");
     screen = GUI_HOME;
     selection = 0u;
     home_selection = 0u;
@@ -635,12 +670,15 @@ void picopen_gui_update_state(const picopen_shell_state_t *state) {
         return;
     }
     gui_state = *state;
+    if ((strcmp(file_path, "/") == 0) || !state->storage_ready) {
+        file_listing = state->storage;
+    }
     if (screen == GUI_STATUS) {
         render_status();
     } else if (screen == GUI_DEVICES) {
         render_devices();
     } else if (screen == GUI_FILES) {
-        if (selection >= gui_state.storage.count) {
+        if (selection >= file_listing.count) {
             selection = 0u;
         }
         render_files();
@@ -659,9 +697,27 @@ void picopen_gui_handle_key(uint8_t key) {
         return;
     }
     if (key == PICOPEN_KEY_ESCAPE) {
+        if ((screen == GUI_FILES) && (strcmp(file_path, "/") != 0)) {
+            char *const separator = strrchr(file_path, '/');
+            if ((separator == NULL) || (separator == file_path)) {
+                strcpy(file_path, "/");
+            } else {
+                *separator = '\0';
+            }
+            const picopen_storage_result_t result =
+                picopen_storage_list_directory(&gui_state.storage_service,
+                                               file_path, &file_listing);
+            if ((result != PICOPEN_STORAGE_OK) &&
+                (result != PICOPEN_STORAGE_LIMIT_REACHED)) {
+                file_listing = (picopen_storage_listing_t){0};
+            }
+            selection = 0u;
+            render_files();
+            return;
+        }
         const gui_screen_t previous_screen = screen;
         screen = parent_screen(screen);
-        if ((screen == GUI_FILES) && (selection >= gui_state.storage.count)) {
+        if ((screen == GUI_FILES) && (selection >= file_listing.count)) {
             selection = 0u;
         } else if (screen == GUI_HOME) {
             selection = home_selection;
@@ -686,10 +742,36 @@ void picopen_gui_handle_key(uint8_t key) {
         return;
     }
     if (screen == GUI_FILES) {
-        const size_t count = gui_state.storage.count;
+        const size_t count = file_listing.count;
         if ((key == PICOPEN_KEY_UP) && (selection > 0u)) --selection;
         if ((key == PICOPEN_KEY_DOWN) && (selection + 1u < count)) ++selection;
         if ((key == PICOPEN_KEY_ENTER) && (count != 0u)) {
+            const picopen_storage_entry_t *const entry =
+                &file_listing.entries[selection];
+            if (entry->directory) {
+                char next_path[PICOPEN_STORAGE_PATH_SIZE];
+                const int length = snprintf(next_path, sizeof(next_path),
+                    strcmp(file_path, "/") == 0 ? "/%s" : "%s/%s",
+                    file_path, entry->name);
+                picopen_storage_listing_t next_listing;
+                const picopen_storage_result_t result =
+                    ((length > 0) && ((size_t)length < sizeof(next_path)))
+                        ? picopen_storage_list_directory(
+                              &gui_state.storage_service, next_path,
+                              &next_listing)
+                        : PICOPEN_STORAGE_INVALID_REQUEST;
+                if ((result == PICOPEN_STORAGE_OK) ||
+                    (result == PICOPEN_STORAGE_LIMIT_REACHED)) {
+                    strcpy(file_path, next_path);
+                    file_listing = next_listing;
+                    selection = 0u;
+                    picopen_audit_record("gui.directory.open", true);
+                } else {
+                    picopen_audit_record("gui.directory.open", false);
+                }
+                render_files();
+                return;
+            }
             screen = GUI_FILE_VIEW;
             render_file();
             return;

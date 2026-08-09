@@ -26,16 +26,38 @@ class SecurityServiceBaselineTests(unittest.TestCase):
         self.assertIn("required_capability", service)
         self.assertIn("service->required_capability", implementation)
 
-    def test_removable_file_reads_are_bounded_and_root_only(self):
+    def test_removable_file_reads_are_bounded_and_path_validated(self):
         header = (ROOT / "services" / "storage" / "include" / "picopen" /
                   "storage.h").read_text(encoding="utf-8")
         implementation = (ROOT / "services" / "storage" /
                           "storage.c").read_text(encoding="utf-8")
         self.assertRegex(header, r"PICOPEN_STORAGE_READ_LIMIT\s+256u")
-        for forbidden in ("character == '/'", "character == '\\\\'",
-                          "character == ':'"):
+        for forbidden in ("character == '\\\\'", "character == ':'"):
             self.assertIn(forbidden, implementation)
+        self.assertRegex(header, r"PICOPEN_STORAGE_MAX_DEPTH\s+4u")
+        self.assertIn("component[1] == '.'", implementation)
         self.assertIn("FA_READ", implementation)
+
+    def test_versioned_storage_tracks_media_and_never_exposes_write(self):
+        header = (ROOT / "services" / "storage" / "include" / "picopen" /
+                  "storage.h").read_text(encoding="utf-8")
+        implementation = (ROOT / "services" / "storage" /
+                          "storage.c").read_text(encoding="utf-8")
+        self.assertIn("PICOPEN_STORAGE_ABI_VERSION 1u", header)
+        self.assertIn("media_generation", header)
+        self.assertIn("PICOPEN_STORAGE_MEDIA_READY_READ_ONLY", header)
+        self.assertIn("picopen_storage_safe_remove", implementation)
+        for forbidden in ("FA_WRITE", "f_unlink", "f_mkdir", "f_rename"):
+            self.assertNotIn(forbidden, implementation)
+
+    def test_file_gui_supports_bounded_metadata_text_and_hex_views(self):
+        gui = (ROOT / "services" / "gui" / "gui.c").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("entry->size", gui)
+        self.assertIn("HEX (FIRST 96 BYTES)", gui)
+        self.assertIn("text_bytes * 100u", gui)
+        self.assertIn("picopen_storage_list_directory", gui)
 
     def test_shutdown_requires_explicit_local_confirmation(self):
         capability = (ROOT / "kernel" / "capability.c").read_text(

@@ -145,9 +145,17 @@ int main(void) {
         keyboard_ready && picopen_keyboard_read_battery(&battery_info);
     picopen_sd_info_t sd_info = {.status = PICOPEN_SD_NO_RESPONSE};
     bool sd_ready = keyboard_ready && picopen_sd_identify(&sd_info);
+    picopen_storage_service_t storage_service;
+    picopen_storage_init(&storage_service);
+    if (sd_ready) {
+        picopen_storage_media_ready(&storage_service);
+    }
     picopen_storage_listing_t storage_listing = {0};
-    bool storage_ready =
-        sd_ready && picopen_storage_list_root(&storage_listing);
+    const picopen_storage_result_t initial_storage_result = sd_ready
+        ? picopen_storage_list_directory(&storage_service, "/", &storage_listing)
+        : PICOPEN_STORAGE_NOT_READY;
+    bool storage_ready = (initial_storage_result == PICOPEN_STORAGE_OK) ||
+                         (initial_storage_result == PICOPEN_STORAGE_LIMIT_REACHED);
     if (display_ready) {
         char keyboard_status[40];
         char sd_status[40];
@@ -312,6 +320,7 @@ int main(void) {
         .storage_ready = storage_ready,
         .battery = battery_info,
         .sd = sd_info,
+        .storage_service = storage_service,
         .storage = storage_listing,
         .security = shell_security,
         .devices = devices,
@@ -347,6 +356,7 @@ int main(void) {
                 battery_ready = false;
                 sd_ready = false;
                 storage_ready = false;
+                picopen_storage_safe_remove(&storage_service);
                 sd_info.status = PICOPEN_SD_NO_RESPONSE;
                 storage_listing = (picopen_storage_listing_t){0};
                 state_changed = true;
@@ -355,9 +365,18 @@ int main(void) {
                 keyboard_ready = true;
                 battery_ready = picopen_keyboard_read_battery(&battery_info);
                 sd_ready = picopen_sd_identify(&sd_info);
+                picopen_storage_media_changed(&storage_service);
+                if (sd_ready) {
+                    picopen_storage_media_ready(&storage_service);
+                }
                 storage_listing = (picopen_storage_listing_t){0};
+                const picopen_storage_result_t refresh_storage_result = sd_ready
+                    ? picopen_storage_list_directory(&storage_service, "/",
+                          &storage_listing)
+                    : PICOPEN_STORAGE_NOT_READY;
                 storage_ready =
-                    sd_ready && picopen_storage_list_root(&storage_listing);
+                    (refresh_storage_result == PICOPEN_STORAGE_OK) ||
+                    (refresh_storage_result == PICOPEN_STORAGE_LIMIT_REACHED);
                 state_changed = true;
             } else if (keyboard_ready) {
                 const picopen_battery_info_t previous = battery_info;
@@ -374,6 +393,7 @@ int main(void) {
                 shell_state.storage_ready = storage_ready;
                 shell_state.battery = battery_info;
                 shell_state.sd = sd_info;
+                shell_state.storage_service = storage_service;
                 shell_state.storage = storage_listing;
                 synchronize_device_states(&shell_state);
                 picopen_shell_update_state(&shell_state);

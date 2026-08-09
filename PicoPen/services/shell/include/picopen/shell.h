@@ -17,6 +17,7 @@ typedef struct picopen_shell_state {
     bool storage_ready;
     picopen_battery_info_t battery;
     picopen_sd_info_t sd;
+    picopen_storage_service_t storage_service;
     picopen_storage_listing_t storage;
     picopen_security_context_t security;
     picopen_device_manager_t devices;
