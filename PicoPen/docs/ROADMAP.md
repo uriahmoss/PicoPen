@@ -222,6 +222,9 @@ power interruptions without corrupting its boot metadata.
   - [x] Add a locked Wi-Fi Update screen that cannot enable networking
   - [ ] Verify GUI navigation and controlled power-off on hardware
   - [ ] Replace text tiles with compositor-drawn synthwave widgets
+    - [x] Add bounded scaled pixel-text and reusable panel primitives
+    - [x] Convert Home to direct synthwave panels, icons, and focus borders
+    - [ ] Convert System, Files, dialogs, and detail screens
 - [ ] Integrate pinned LVGL behind the PicoPen compositor and input services
 - [ ] Use Pico SDK-pinned TinyUSB and networking stacks behind capability checks
 

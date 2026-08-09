@@ -238,3 +238,38 @@ void picopen_terminal_render(void) {
     rendered_cursor_row = cursor_row;
     rendered_cursor_valid = true;
 }
+
+void picopen_terminal_draw_text_at(uint16_t x, uint16_t y, const char *text,
+                                   uint8_t scale, uint32_t foreground,
+                                   uint32_t background) {
+    if ((text == NULL) || (scale == 0u) || (scale > 4u)) {
+        return;
+    }
+    const uint16_t cell_width = (uint16_t)(GLYPH_WIDTH + 1u) * scale;
+    const uint16_t cell_height = GLYPH_HEIGHT * scale;
+    for (; *text != '\0'; ++text) {
+        if (*text == '\n') {
+            x = 0u;
+            y = (uint16_t)(y + cell_height + scale);
+            continue;
+        }
+        if (((uint32_t)x + cell_width > TERMINAL_COLUMNS * CELL_WIDTH) ||
+            ((uint32_t)y + cell_height > TERMINAL_ROWS * CELL_HEIGHT)) {
+            return;
+        }
+        picopen_display_fill_rect(x, y, cell_width, cell_height, background);
+        const uint8_t *const glyph = glyph_for(*text);
+        for (uint16_t row = 0u; row < GLYPH_HEIGHT; ++row) {
+            for (uint16_t column = 0u; column < GLYPH_WIDTH; ++column) {
+                if ((glyph[row] & (UINT8_C(1) <<
+                     (GLYPH_WIDTH - 1u - column))) == 0u) {
+                    continue;
+                }
+                picopen_display_fill_rect(
+                    (uint16_t)(x + column * scale),
+                    (uint16_t)(y + row * scale), scale, scale, foreground);
+            }
+        }
+        x = (uint16_t)(x + cell_width);
+    }
+}

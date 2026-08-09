@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "picopen/audit.h"
+#include "picopen/display.h"
 #include "picopen/keyboard.h"
 #include "picopen/storage.h"
 #include "picopen/terminal.h"
@@ -12,6 +13,16 @@
 #define GUI_SCREEN_SIZE 1024u
 #define GUI_HOME_ITEMS 6u
 #define GUI_SYSTEM_ITEMS 5u
+
+#define GUI_COLOR_BACKGROUND UINT32_C(0x080020)
+#define GUI_COLOR_PANEL      UINT32_C(0x101040)
+#define GUI_COLOR_HEADER     UINT32_C(0x12002F)
+#define GUI_COLOR_CYAN       UINT32_C(0x00E5FF)
+#define GUI_COLOR_MAGENTA    UINT32_C(0xFF2BD6)
+#define GUI_COLOR_VIOLET     UINT32_C(0x8B5CF6)
+#define GUI_COLOR_ORANGE     UINT32_C(0xFF8A30)
+#define GUI_COLOR_GOLD       UINT32_C(0xFFCC00)
+#define GUI_COLOR_MUTED      UINT32_C(0x7590B8)
 
 typedef enum gui_screen {
     GUI_HOME = 0,
@@ -70,21 +81,105 @@ static void item(const char *label, size_t index) {
     append(selection == index ? "> [ %-14s ]\n" : "  [ %-14s ]\n", label);
 }
 
+static void outline(uint16_t x, uint16_t y, uint16_t width, uint16_t height,
+                    uint16_t thickness, uint32_t color) {
+    picopen_display_fill_rect(x, y, width, thickness, color);
+    picopen_display_fill_rect(x, (uint16_t)(y + height - thickness), width,
+                              thickness, color);
+    picopen_display_fill_rect(x, y, thickness, height, color);
+    picopen_display_fill_rect((uint16_t)(x + width - thickness), y, thickness,
+                              height, color);
+}
+
+static void tile_icon(size_t index, uint16_t center_x, uint16_t y,
+                      uint32_t color) {
+    if (index == 0u) {
+        for (uint16_t bar = 0u; bar < 4u; ++bar) {
+            const uint16_t height = (uint16_t)(5u + bar * 3u);
+            picopen_display_fill_rect((uint16_t)(center_x - 18u + bar * 10u),
+                (uint16_t)(y + 17u - height), 5u, height, color);
+        }
+    } else if (index == 1u) {
+        outline((uint16_t)(center_x - 18u), (uint16_t)(y + 4u), 36u, 18u,
+                2u, color);
+        picopen_display_fill_rect((uint16_t)(center_x - 14u), y, 16u, 5u,
+                                  color);
+    } else if (index == 2u) {
+        outline((uint16_t)(center_x - 13u), y, 26u, 22u, 2u, color);
+        for (uint16_t pin = 0u; pin < 3u; ++pin) {
+            picopen_display_fill_rect((uint16_t)(center_x - 18u + pin * 12u),
+                                      (uint16_t)(y + 5u), 5u, 2u, color);
+            picopen_display_fill_rect((uint16_t)(center_x - 18u + pin * 12u),
+                                      (uint16_t)(y + 15u), 5u, 2u, color);
+        }
+    } else if (index == 3u) {
+        outline((uint16_t)(center_x - 20u), y, 40u, 22u, 2u, color);
+        picopen_display_fill_rect((uint16_t)(center_x - 14u),
+                                  (uint16_t)(y + 6u), 20u, 2u, color);
+        picopen_display_fill_rect((uint16_t)(center_x - 14u),
+                                  (uint16_t)(y + 12u), 12u, 2u, color);
+    } else if (index == 4u) {
+        outline((uint16_t)(center_x - 14u), y, 28u, 22u, 2u, color);
+        picopen_display_fill_rect((uint16_t)(center_x - 7u),
+                                  (uint16_t)(y + 10u), 5u, 2u, color);
+        picopen_display_fill_rect((uint16_t)(center_x - 2u),
+                                  (uint16_t)(y + 13u), 5u, 2u, color);
+        picopen_display_fill_rect((uint16_t)(center_x + 3u),
+                                  (uint16_t)(y + 7u), 5u, 2u, color);
+    } else {
+        picopen_display_fill_rect((uint16_t)(center_x - 2u), y, 4u, 9u,
+                                  color);
+        outline((uint16_t)(center_x - 12u), (uint16_t)(y + 6u), 24u, 17u,
+                2u, color);
+    }
+}
+
+static void graphical_tile(size_t index, const char *label, uint16_t x,
+                           uint16_t y) {
+    static const uint32_t accents[GUI_HOME_ITEMS] = {
+        GUI_COLOR_MAGENTA, GUI_COLOR_CYAN, GUI_COLOR_CYAN,
+        GUI_COLOR_VIOLET, GUI_COLOR_MAGENTA, GUI_COLOR_ORANGE,
+    };
+    const bool focused = selection == index;
+    const uint32_t accent = focused ? GUI_COLOR_CYAN : accents[index];
+    picopen_display_fill_rect(x, y, 148u, 66u, GUI_COLOR_PANEL);
+    outline(x, y, 148u, 66u, focused ? 3u : 2u, accent);
+    tile_icon(index, (uint16_t)(x + 74u), (uint16_t)(y + 8u), accent);
+    const size_t length = strlen(label);
+    const uint16_t text_width = (uint16_t)(length * 12u);
+    picopen_terminal_draw_text_at(
+        (uint16_t)(x + (148u - text_width) / 2u), (uint16_t)(y + 39u), label,
+        2u, accent, GUI_COLOR_PANEL);
+}
+
 static void render_home(void) {
     static const char *const labels[GUI_HOME_ITEMS] = {
         "STATUS", "FILES", "DEVICES", "WORKBENCH", "AUDIT", "SYSTEM",
     };
-    begin("HOME");
-    append("\n");
-    for (size_t row = 0u; row < 3u; ++row) {
-        const size_t left = row * 2u;
-        const size_t right = left + 1u;
-        append(selection == left ? ">[%-14s] " : " [%-14s] ", labels[left]);
-        append(selection == right ? ">[%-14s]\n\n" : " [%-14s]\n\n",
-               labels[right]);
+    picopen_display_fill_rect(0u, 0u, 320u, 320u, GUI_COLOR_BACKGROUND);
+    picopen_display_fill_rect(0u, 0u, 320u, 44u, GUI_COLOR_HEADER);
+    picopen_display_fill_rect(0u, 43u, 320u, 1u, GUI_COLOR_VIOLET);
+    picopen_terminal_draw_text_at(8u, 10u, "PICOPEN", 2u,
+                                  GUI_COLOR_MAGENTA, GUI_COLOR_HEADER);
+    picopen_terminal_draw_text_at(176u, 8u, "SD RO", 1u, GUI_COLOR_GOLD,
+                                  GUI_COLOR_HEADER);
+    picopen_terminal_draw_text_at(216u, 8u, "SCOPE OFF", 1u, GUI_COLOR_CYAN,
+                                  GUI_COLOR_HEADER);
+    picopen_terminal_draw_text_at(216u, 23u, "LOCKED", 1u, GUI_COLOR_MUTED,
+                                  GUI_COLOR_HEADER);
+    for (size_t index = 0u; index < GUI_HOME_ITEMS; ++index) {
+        const uint16_t x = (index & 1u) == 0u ? 8u : 164u;
+        const uint16_t y = (uint16_t)(50u + (index / 2u) * 76u);
+        graphical_tile(index, labels[index], x, y);
     }
-    append("\nARROWS MOVE  ENTER SELECT\n");
-    present();
+    picopen_display_fill_rect(0u, 282u, 320u, 38u, GUI_COLOR_HEADER);
+    picopen_display_fill_rect(0u, 282u, 320u, 1u, GUI_COLOR_VIOLET);
+    picopen_terminal_draw_text_at(10u, 294u, "ARROWS MOVE", 1u,
+                                  GUI_COLOR_MAGENTA, GUI_COLOR_HEADER);
+    picopen_terminal_draw_text_at(116u, 294u, "ENTER SELECT", 1u,
+                                  GUI_COLOR_CYAN, GUI_COLOR_HEADER);
+    picopen_terminal_draw_text_at(244u, 294u, "ESC BACK", 1u,
+                                  GUI_COLOR_VIOLET, GUI_COLOR_HEADER);
 }
 
 static void render_status(void) {

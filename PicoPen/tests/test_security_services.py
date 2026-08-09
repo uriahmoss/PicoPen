@@ -66,6 +66,19 @@ class SecurityServiceBaselineTests(unittest.TestCase):
         self.assertNotIn("cyw43_arch_enable_sta_mode", gui)
         self.assertNotIn("cyw43_arch_wifi_connect", gui)
 
+    def test_graphical_home_uses_bounded_direct_widgets(self):
+        terminal = (ROOT / "drivers" / "terminal" / "terminal.c").read_text(
+            encoding="utf-8"
+        )
+        gui = (ROOT / "services" / "gui" / "gui.c").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("scale > 4u", terminal)
+        self.assertIn("graphical_tile", gui)
+        self.assertIn("GUI_COLOR_CYAN", gui)
+        self.assertIn("SCOPE OFF", gui)
+        self.assertIn("LOCKED", gui)
+
 
 if __name__ == "__main__":
     unittest.main()
