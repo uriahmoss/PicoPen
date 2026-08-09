@@ -141,6 +141,13 @@ identity, while invalid images enter a recoverable state.
       confirming `KBD FW: 0X16 READY 10K`, PicoPen identified the inserted card
       over hardware SPI as SDHC/SDXC v2 with card detect active and OCR
       `0xC0FF8000`.
+  - [x] Read and classify boot sectors without mounting a filesystem
+    - Read only LBA 0 and, when present, the first MBR partition boot sector.
+    - Bound command response and data-token waits to 500 ms.
+    - Recognize FAT12/16/32 and exFAT signatures; expose no write, erase,
+      formatting, or mount interface.
+    - Hardware evidence: the CPI 2.0 unit read the first partition boot sector,
+      identified FAT at LBA 2048, and continued accepting keyboard input.
 - [ ] Battery status and controlled shutdown
 - [ ] PSRAM test and allocator
 

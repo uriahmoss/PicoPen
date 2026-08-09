@@ -94,12 +94,11 @@ int main(void) {
                      keyboard_info.found_address);
         }
         if (sd_ready) {
-            snprintf(sd_status, sizeof(sd_status), "SD: %s V%s %s D%u OCR:%08lX\n",
+            snprintf(sd_status, sizeof(sd_status), "SD: %s %s %s LBA:%lu\n",
                      sd_info.high_capacity ? "SDHC/XC" : "SDSC",
+                     picopen_sd_filesystem_name(sd_info.filesystem),
                      sd_info.version_2 ? "2" : "1",
-                     sd_info.software_spi ? "BB" : "HW",
-                     sd_info.card_detected ? 1u : 0u,
-                     (unsigned long)sd_info.ocr);
+                     (unsigned long)sd_info.first_partition_lba);
         } else {
             snprintf(sd_status, sizeof(sd_status), "SD: %s %s D%u R1:%02X\n",
                      picopen_sd_status_name(sd_info.status),
@@ -130,13 +129,16 @@ int main(void) {
            keyboard_info.scl_high ? 1u : 0u,
            keyboard_info.found_address);
     printf("sd: %s; detected=%u; transport=%s; type=%s; version=%u; r1=0x%02x; "
-           "ocr=0x%08lx\r\n",
+           "ocr=0x%08lx; sector=%u; partitioned=%u; first-lba=%lu; fs=%s\r\n",
            picopen_sd_status_name(sd_info.status),
            sd_info.card_detected ? 1u : 0u,
            sd_info.software_spi ? "software" : "hardware",
            sd_info.high_capacity ? "SDHC/XC" : "SDSC",
            sd_info.version_2 ? 2u : 1u, sd_info.last_response,
-           (unsigned long)sd_info.ocr);
+           (unsigned long)sd_info.ocr, sd_info.sector_read ? 1u : 0u,
+           sd_info.partitioned ? 1u : 0u,
+           (unsigned long)sd_info.first_partition_lba,
+           picopen_sd_filesystem_name(sd_info.filesystem));
 
     for (;;) {
         picopen_key_event_t event;

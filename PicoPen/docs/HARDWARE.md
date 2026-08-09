@@ -60,6 +60,11 @@ accepts the GPIO 16-19 transport and active-low GPIO 22 card detect on the CPI
 2.0 unit. The current driver intentionally exposes no block write, erase,
 formatting, or filesystem mutation operation.
 
+The follow-on bounded read test successfully read LBA 0 and the first MBR
+partition boot sector, identifying a FAT filesystem beginning at LBA 2048.
+Keyboard input remained responsive after the probe. The implementation mounts
+nothing and contains no block-write, erase, or formatting interface.
+
 The V2.0 schematic powers SD VDD from the PMIC-controlled ALDO1 rail rather
 than the Pico's 3V3 output. ClockworkPi's pinned SD booter waits 1.5 seconds
 after active-low card detection before starting SPI; PicoPen mirrors that

@@ -16,12 +16,15 @@
 #define SD_INIT_DELAY_MS      10u
 #define SD_SOFTWARE_HALF_PERIOD_US 2u
 #define SD_READY_TIMEOUT_MS   500u
+#define SD_DATA_TIMEOUT_MS    500u
 #define SD_POWER_STABILIZATION_MS 1500u
+#define SD_SECTOR_SIZE        512u
 
 #define SD_COMMAND_GO_IDLE       0u
 #define SD_COMMAND_SEND_IF_COND  8u
 #define SD_COMMAND_APP          55u
 #define SD_COMMAND_READ_OCR     58u
+#define SD_COMMAND_READ_SINGLE  17u
 #define SD_APP_COMMAND_INIT     41u
 
 #define SD_R1_IDLE          0x01u
@@ -31,6 +34,9 @@
 #define SD_INIT_HCS         UINT32_C(0x40000000)
 #define SD_OCR_POWERED      UINT32_C(0x80000000)
 #define SD_OCR_HIGH_CAPACITY UINT32_C(0x40000000)
+#define SD_DATA_TOKEN        0xFEu
+#define SD_BOOT_SIGNATURE_LO 0x55u
+#define SD_BOOT_SIGNATURE_HI 0xAAu
 
 static spi_inst_t *const sd_spi = spi0;
 static bool software_spi;
@@ -110,8 +116,7 @@ static void finish_transport(void) {
     }
 }
 
-static uint8_t command(uint8_t index, uint32_t argument,
-                       uint8_t *extra, size_t extra_length) {
+static uint8_t command_begin(uint8_t index, uint32_t argument) {
     uint8_t packet[] = {
         (uint8_t)(0x40u | index),
         (uint8_t)(argument >> 24u),
@@ -136,6 +141,12 @@ static uint8_t command(uint8_t index, uint32_t argument,
             break;
         }
     }
+    return response;
+}
+
+static uint8_t command(uint8_t index, uint32_t argument,
+                       uint8_t *extra, size_t extra_length) {
+    const uint8_t response = command_begin(index, argument);
     for (size_t index_extra = 0u; index_extra < extra_length; ++index_extra) {
         extra[index_extra] = transfer(0xFFu);
     }
@@ -148,6 +159,98 @@ static uint32_t decode_u32(const uint8_t bytes[4]) {
            ((uint32_t)bytes[1] << 16u) |
            ((uint32_t)bytes[2] << 8u) |
            bytes[3];
+}
+
+static uint32_t decode_le_u32(const uint8_t bytes[4]) {
+    return ((uint32_t)bytes[3] << 24u) |
+           ((uint32_t)bytes[2] << 16u) |
+           ((uint32_t)bytes[1] << 8u) |
+           bytes[0];
+}
+
+static bool bytes_equal(const uint8_t *left, const char *right,
+                        size_t length) {
+    for (size_t index = 0u; index < length; ++index) {
+        if (left[index] != (uint8_t)right[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static picopen_sd_filesystem_t detect_filesystem(const uint8_t sector[512]) {
+    if (bytes_equal(&sector[3], "EXFAT   ", 8u)) {
+        return PICOPEN_SD_FILESYSTEM_EXFAT;
+    }
+    if (bytes_equal(&sector[54], "FAT12   ", 8u) ||
+        bytes_equal(&sector[54], "FAT16   ", 8u) ||
+        bytes_equal(&sector[82], "FAT32   ", 8u)) {
+        return PICOPEN_SD_FILESYSTEM_FAT;
+    }
+    return PICOPEN_SD_FILESYSTEM_UNKNOWN;
+}
+
+static bool read_sector(uint32_t lba, bool high_capacity,
+                        uint8_t sector[SD_SECTOR_SIZE], uint8_t *response) {
+    if (!high_capacity && (lba > (UINT32_MAX / SD_SECTOR_SIZE))) {
+        return false;
+    }
+    const uint32_t address = high_capacity ? lba : lba * SD_SECTOR_SIZE;
+    *response = command_begin(SD_COMMAND_READ_SINGLE, address);
+    if (*response != 0u) {
+        deselect();
+        return false;
+    }
+    const absolute_time_t deadline = make_timeout_time_ms(SD_DATA_TIMEOUT_MS);
+    uint8_t token;
+    do {
+        token = transfer(0xFFu);
+        if (token == SD_DATA_TOKEN) {
+            break;
+        }
+    } while (!time_reached(deadline));
+    if (token != SD_DATA_TOKEN) {
+        deselect();
+        return false;
+    }
+    for (size_t index = 0u; index < SD_SECTOR_SIZE; ++index) {
+        sector[index] = transfer(0xFFu);
+    }
+    (void)transfer(0xFFu);
+    (void)transfer(0xFFu);
+    deselect();
+    return true;
+}
+
+static bool inspect_boot_sectors(picopen_sd_info_t *info) {
+    uint8_t sector[SD_SECTOR_SIZE];
+    if (!read_sector(0u, info->high_capacity, sector, &info->last_response)) {
+        info->status = PICOPEN_SD_READ_ERROR;
+        return false;
+    }
+    info->sector_read = true;
+    info->filesystem = detect_filesystem(sector);
+    if (info->filesystem != PICOPEN_SD_FILESYSTEM_UNKNOWN) {
+        return true;
+    }
+    if ((sector[510] != SD_BOOT_SIGNATURE_LO) ||
+        (sector[511] != SD_BOOT_SIGNATURE_HI)) {
+        return true;
+    }
+    const uint8_t *const first_partition = &sector[446];
+    info->first_partition_lba = decode_le_u32(&first_partition[8]);
+    info->partitioned = (first_partition[4] != 0u) &&
+                        (info->first_partition_lba != 0u);
+    if (!info->partitioned) {
+        return true;
+    }
+    if (!read_sector(info->first_partition_lba, info->high_capacity, sector,
+                     &info->last_response)) {
+        info->status = PICOPEN_SD_READ_ERROR;
+        return false;
+    }
+    info->filesystem = detect_filesystem(sector);
+    return true;
 }
 
 static bool enter_idle(picopen_sd_info_t *info) {
@@ -258,6 +361,10 @@ bool picopen_sd_identify(picopen_sd_info_t *info) {
         return false;
     }
     info->high_capacity = (info->ocr & SD_OCR_HIGH_CAPACITY) != 0u;
+    if (!inspect_boot_sectors(info)) {
+        finish_transport();
+        return false;
+    }
     info->status = PICOPEN_SD_READY;
     finish_transport();
     return true;
@@ -266,9 +373,18 @@ bool picopen_sd_identify(picopen_sd_info_t *info) {
 const char *picopen_sd_status_name(picopen_sd_status_t status) {
     static const char *const names[] = {
         "ready", "no-response", "bad-voltage", "init-timeout", "ocr-error",
+        "read-error",
     };
     if ((unsigned int)status >= sizeof(names) / sizeof(names[0])) {
         return "unknown";
     }
     return names[status];
+}
+
+const char *picopen_sd_filesystem_name(picopen_sd_filesystem_t filesystem) {
+    static const char *const names[] = {"unknown", "FAT", "exFAT"};
+    if ((unsigned int)filesystem >= sizeof(names) / sizeof(names[0])) {
+        return "unknown";
+    }
+    return names[filesystem];
 }
