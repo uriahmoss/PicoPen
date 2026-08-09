@@ -131,6 +131,19 @@ bool picopen_keyboard_poll(picopen_key_event_t *event) {
     return true;
 }
 
+bool picopen_keyboard_health_check(void) {
+    if (!initialized) {
+        return false;
+    }
+    uint8_t response[2] = {0u, 0u};
+    if (!read_register(KEYBOARD_REGISTER_VERSION, response) ||
+        (response[0] != 0u) || (response[1] == 0u)) {
+        initialized = false;
+        return false;
+    }
+    return true;
+}
+
 bool picopen_keyboard_read_battery(picopen_battery_info_t *battery) {
     if (!initialized || (battery == NULL)) {
         return false;

@@ -26,6 +26,7 @@ review gates and are never implied by acceleration.
   - Partial graphical redraws and measured input latency
   - Synthwave System, Files, status, dialog, and recovery screens
   - Battery warnings, backlight control, and locally confirmed shutdown
+  - Data-only menu skins with preview, accessibility checks, and safe fallback
 - [ ] **Bundle B: passive security workbench**
   - Engagement-scope editor and persistent scope/security indicators
   - Receive-only GPIO, ADC, I2C, SPI, UART, and attachment inventory
@@ -91,7 +92,9 @@ review gates and are never implied by acceleration.
   - [x] Select the newest valid A/B generation with wraparound handling
   - [x] Write the alternate metadata sector and verify it before transfer
   - [x] Persist a pending attempt before entering the OS
-  - [x] Confirm boot and reset attempts after core runtime and USB are ready
+  - [x] Confirm boot and reset attempts after core runtime is ready
+    - USB was required during initial Slice 1E hardware validation; Slice 2B
+      removes it from the success condition so battery-only boot can succeed.
   - [x] Enter recovery after three unconfirmed attempts or a metadata error
   - [x] Add a local `retry` command that safely clears an attempt lockout
   - [x] Pass host tests for corruption, interrupted writes, and generation wrap
@@ -191,15 +194,15 @@ identity, while invalid images enter a recoverable state.
     - Hardware power-off verification remains part of the next baseline test.
 - [ ] PSRAM test and allocator
 - [ ] **Slice 2B:** Make PicoCalc boot and peripheral discovery power-order safe
-  - Remove USB CDC connection as an OS boot-success requirement
-  - Allow USB serial to attach and detach without changing device readiness
-  - Show bounded graphical boot progress while board services stabilize
-  - Retry keyboard and battery discovery before declaring them unavailable
-  - Initialize SD only after keyboard/PMIC readiness and rail stabilization
-  - Retry failed peripherals in the background without blocking the GUI
-  - Update device-manager states when hardware disappears or recovers
-  - Verify battery-only, USB-only, warm-reset, cold-boot, and cable hot-plug paths
-  - Eliminate the full-power-removal and delayed-USB workaround
+  - [x] Remove USB CDC connection as an OS boot-success requirement
+  - [x] Allow USB serial presence to remain independent of device readiness
+  - [x] Show bounded graphical boot progress while board services stabilize
+  - [x] Retry keyboard discovery for a bounded five-second readiness window
+  - [x] Initialize battery and SD only after keyboard/PMIC readiness
+  - [x] Recheck controller health and recover failed peripherals in the runtime
+  - [x] Update shell, GUI, audit, and device-manager state after recovery
+  - [ ] Verify battery-only, USB-only, warm-reset, cold-boot, and cable hot-plug paths
+  - [ ] Eliminate the full-power-removal and delayed-USB workaround on hardware
 
 Exit condition: an interactive terminal survives repeated cold boots and forced
 power interruptions without corrupting its boot metadata.
@@ -271,12 +274,27 @@ power interruptions without corrupting its boot metadata.
     - [ ] Convert System, Files, dialogs, and detail screens
 - [ ] **Slice 3E:** Complete the responsive graphical platform bundle
   - Add reusable screen stack, panels, lists, dialogs, progress, and notices
+  - Remember the last selection independently for each menu and file list
   - Coalesce held navigation events and measure key-to-focus latency
   - Evaluate 100 and 400 kHz keyboard operation with safe fallback
   - Redraw only changed widgets during navigation and background updates
   - Add graphical device-recovery, crash-summary, and degraded-mode screens
   - Add idle timeout, backlight settings, battery warning, and power controls
   - Preserve Advanced Terminal as a policy-equivalent application
+  - Add `System > Appearance > Skins`
+    - Define a versioned, fixed-size, data-only skin schema with no executable
+      code, scripts, arbitrary drawing commands, or direct hardware access
+    - Centralize background, panel, focus, warning, success, muted, header,
+      footer, border, spacing, and text-scale tokens
+    - Ship built-in Synthwave, High Contrast, and Minimal Dark skins
+    - Preview without persistence and provide explicit Apply, Cancel, and
+      Restore Default actions
+    - Enforce minimum contrast, bounds, supported token values, and complete
+      fallback to the built-in safe skin when validation fails
+    - Keep imported SD skins disabled until the bounded parser and provenance
+      policy are reviewed; treat every imported skin as untrusted data
+    - Keep persistent selection disabled until the littlefs settings layout is
+      approved and power-loss behavior is tested
 - [ ] Integrate pinned LVGL behind the PicoPen compositor and input services
 - [ ] Use Pico SDK-pinned TinyUSB and networking stacks behind capability checks
 

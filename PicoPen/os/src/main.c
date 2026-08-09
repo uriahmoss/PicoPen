@@ -28,6 +28,10 @@
 #define PICOPEN_VERSION "unknown"
 #endif
 
+#define PICOPEN_CONTROLLER_READY_MS 5000u
+#define PICOPEN_CONTROLLER_RETRY_MS 250u
+#define PICOPEN_DEVICE_HEALTH_MS    5000u
+
 typedef struct heartbeat_context {
     picopen_work_queue_t *queue;
 } heartbeat_context_t;
@@ -52,6 +56,37 @@ static bool system_status_handler(const picopen_ipc_message_t *request,
     return true;
 }
 
+static bool initialize_keyboard_bounded(picopen_keyboard_info_t *info,
+                                        bool show_progress) {
+    const absolute_time_t deadline =
+        make_timeout_time_ms(PICOPEN_CONTROLLER_READY_MS);
+    do {
+        if (picopen_keyboard_init(info)) {
+            return true;
+        }
+        if (show_progress) {
+            picopen_gui_show_boot_status("BOARD CONTROLLER", "WAITING FOR CPI 2.0");
+        }
+        sleep_ms(PICOPEN_CONTROLLER_RETRY_MS);
+    } while (!time_reached(deadline));
+    return false;
+}
+
+static void synchronize_device_states(picopen_shell_state_t *state) {
+    (void)picopen_device_set_state(&state->devices, PICOPEN_DEVICE_KEYBOARD,
+        state->keyboard_ready ? PICOPEN_DEVICE_READY
+                              : PICOPEN_DEVICE_UNAVAILABLE);
+    (void)picopen_device_set_state(&state->devices, PICOPEN_DEVICE_BATTERY,
+        state->battery_ready ? PICOPEN_DEVICE_READY
+                             : PICOPEN_DEVICE_UNAVAILABLE);
+    (void)picopen_device_set_state(&state->devices, PICOPEN_DEVICE_SD,
+        state->sd.status == PICOPEN_SD_READY ? PICOPEN_DEVICE_READY_READ_ONLY
+                                            : PICOPEN_DEVICE_UNAVAILABLE);
+    (void)picopen_device_set_state(&state->devices, PICOPEN_DEVICE_FATFS,
+        state->storage_ready ? PICOPEN_DEVICE_READY_READ_ONLY
+                             : PICOPEN_DEVICE_UNAVAILABLE);
+}
+
 int main(void) {
     watchdog_hw->scratch[PICOPEN_BOOT_ATTEMPT_SCRATCH] =
         PICOPEN_BOOT_ATTEMPT_OS_ENTERED;
@@ -61,17 +96,6 @@ int main(void) {
     reset_block(RESETS_RESET_USBCTRL_BITS);
     unreset_block_wait(RESETS_RESET_USBCTRL_BITS);
     stdio_init_all();
-
-    const absolute_time_t usb_deadline =
-        make_timeout_time_ms(PICOPEN_OS_USB_WAIT_MS);
-    while (!stdio_usb_connected() && !time_reached(usb_deadline)) {
-        sleep_ms(10u);
-    }
-    if (!stdio_usb_connected()) {
-        watchdog_hw->scratch[PICOPEN_BOOT_ATTEMPT_SCRATCH] =
-            PICOPEN_BOOT_ATTEMPT_USB_TIMEOUT;
-        watchdog_reboot(0u, 0u, 0u);
-    }
 
     picopen_boot_metadata_v1_t metadata;
     if (!picopen_boot_metadata_load(&metadata) ||
@@ -108,15 +132,19 @@ int main(void) {
     printf("boot-success: confirmed; attempts reset to 0/%u\r\n",
            PICOPEN_BOOT_MAX_ATTEMPTS);
     const bool display_ready = picopen_display_init();
+    if (display_ready) {
+        picopen_gui_show_boot_status("CORE READY", "DISCOVERING DEVICES");
+    }
     picopen_keyboard_info_t keyboard_info;
-    const bool keyboard_ready = picopen_keyboard_init(&keyboard_info);
+    bool keyboard_ready =
+        initialize_keyboard_bounded(&keyboard_info, display_ready);
     picopen_battery_info_t battery_info = {0};
-    const bool battery_ready =
+    bool battery_ready =
         keyboard_ready && picopen_keyboard_read_battery(&battery_info);
-    picopen_sd_info_t sd_info;
-    const bool sd_ready = picopen_sd_identify(&sd_info);
+    picopen_sd_info_t sd_info = {.status = PICOPEN_SD_NO_RESPONSE};
+    bool sd_ready = keyboard_ready && picopen_sd_identify(&sd_info);
     picopen_storage_listing_t storage_listing = {0};
-    const bool storage_ready =
+    bool storage_ready =
         sd_ready && picopen_storage_list_root(&storage_listing);
     if (display_ready) {
         char keyboard_status[40];
@@ -178,6 +206,8 @@ int main(void) {
     }
     printf("display: %s\r\n",
            display_ready ? "terminal diagnostic rendered" : "unavailable");
+    printf("usb-console: %s; boot-independent\r\n",
+           stdio_usb_connected() ? "connected" : "not connected");
     printf("keyboard: %s; firmware=0x%02x; baud=%lu; write=%d; read=%d; "
            "raw=%02x%02x; lines=%u%u; found=0x%02x\r\n",
            keyboard_ready ? "ready" : "unavailable",
@@ -215,28 +245,28 @@ int main(void) {
 
     picopen_device_manager_t devices;
     picopen_device_manager_init(&devices);
-    (void)picopen_device_register(&devices, 1u, "DISPLAY",
+    (void)picopen_device_register(&devices, PICOPEN_DEVICE_DISPLAY, "DISPLAY",
         display_ready ? PICOPEN_DEVICE_READY : PICOPEN_DEVICE_UNAVAILABLE,
         false);
-    (void)picopen_device_register(&devices, 2u, "KEYBOARD",
+    (void)picopen_device_register(&devices, PICOPEN_DEVICE_KEYBOARD, "KEYBOARD",
         keyboard_ready ? PICOPEN_DEVICE_READY : PICOPEN_DEVICE_UNAVAILABLE,
         false);
-    (void)picopen_device_register(&devices, 3u, "SD",
+    (void)picopen_device_register(&devices, PICOPEN_DEVICE_SD, "SD",
         sd_ready ? PICOPEN_DEVICE_READY_READ_ONLY : PICOPEN_DEVICE_UNAVAILABLE,
         false);
-    (void)picopen_device_register(&devices, 4u, "FATFS",
+    (void)picopen_device_register(&devices, PICOPEN_DEVICE_FATFS, "FATFS",
         storage_ready ? PICOPEN_DEVICE_READY_READ_ONLY
                       : PICOPEN_DEVICE_UNAVAILABLE, false);
-    (void)picopen_device_register(&devices, 5u, "BATTERY",
+    (void)picopen_device_register(&devices, PICOPEN_DEVICE_BATTERY, "BATTERY",
         battery_ready ? PICOPEN_DEVICE_READY : PICOPEN_DEVICE_UNAVAILABLE,
         false);
-    (void)picopen_device_register(&devices, 6u, "PSRAM",
+    (void)picopen_device_register(&devices, PICOPEN_DEVICE_PSRAM, "PSRAM",
         PICOPEN_DEVICE_UNVERIFIED, false);
-    (void)picopen_device_register(&devices, 7u, "WIFI",
+    (void)picopen_device_register(&devices, PICOPEN_DEVICE_WIFI, "WIFI",
         PICOPEN_DEVICE_DISABLED_POLICY, false);
-    (void)picopen_device_register(&devices, 8u, "BLE",
+    (void)picopen_device_register(&devices, PICOPEN_DEVICE_BLE, "BLE",
         PICOPEN_DEVICE_DISABLED_POLICY, false);
-    (void)picopen_device_register(&devices, 9u, "ATTACHMENTS",
+    (void)picopen_device_register(&devices, PICOPEN_DEVICE_ATTACHMENTS, "ATTACHMENTS",
         PICOPEN_DEVICE_DISABLED_POLICY, true);
 
     picopen_engagement_t engagement;
@@ -274,7 +304,7 @@ int main(void) {
         (picopen_ipc_dispatch(&ipc, &shell_security, true, &denied_request,
                               &denied_response) == PICOPEN_IPC_DENIED);
 
-    const picopen_shell_state_t shell_state = {
+    picopen_shell_state_t shell_state = {
         .keyboard_ready = keyboard_ready,
         .battery_ready = battery_ready,
         .storage_ready = storage_ready,
@@ -297,6 +327,9 @@ int main(void) {
     (void)picopen_work_schedule(&work_queue, time_us_64() / 1000u, heartbeat,
                                 &heartbeat_context);
 
+    uint64_t next_device_health_ms =
+        time_us_64() / 1000u + PICOPEN_DEVICE_HEALTH_MS;
+
     for (;;) {
         picopen_key_event_t event;
         if (display_ready && keyboard_ready && picopen_keyboard_poll(&event) &&
@@ -305,6 +338,48 @@ int main(void) {
             printf("key: 0x%02x state=%u\r\n", event.key, event.state);
         }
         const uint64_t now_ms = time_us_64() / 1000u;
+        if (now_ms >= next_device_health_ms) {
+            bool state_changed = false;
+            if (keyboard_ready && !picopen_keyboard_health_check()) {
+                keyboard_ready = false;
+                battery_ready = false;
+                sd_ready = false;
+                storage_ready = false;
+                sd_info.status = PICOPEN_SD_NO_RESPONSE;
+                storage_listing = (picopen_storage_listing_t){0};
+                state_changed = true;
+            } else if (!keyboard_ready &&
+                       picopen_keyboard_init(&keyboard_info)) {
+                keyboard_ready = true;
+                battery_ready = picopen_keyboard_read_battery(&battery_info);
+                sd_ready = picopen_sd_identify(&sd_info);
+                storage_listing = (picopen_storage_listing_t){0};
+                storage_ready =
+                    sd_ready && picopen_storage_list_root(&storage_listing);
+                state_changed = true;
+            } else if (keyboard_ready) {
+                const picopen_battery_info_t previous = battery_info;
+                const bool previous_ready = battery_ready;
+                battery_ready = picopen_keyboard_read_battery(&battery_info);
+                state_changed = (previous_ready != battery_ready) ||
+                    (battery_ready &&
+                     ((previous.percent != battery_info.percent) ||
+                      (previous.charging != battery_info.charging)));
+            }
+            if (state_changed) {
+                shell_state.keyboard_ready = keyboard_ready;
+                shell_state.battery_ready = battery_ready;
+                shell_state.storage_ready = storage_ready;
+                shell_state.battery = battery_info;
+                shell_state.sd = sd_info;
+                shell_state.storage = storage_listing;
+                synchronize_device_states(&shell_state);
+                picopen_shell_update_state(&shell_state);
+                picopen_gui_update_state(&shell_state);
+                picopen_audit_record("devices.refresh", true);
+            }
+            next_device_health_ms = now_ms + PICOPEN_DEVICE_HEALTH_MS;
+        }
         (void)picopen_work_run_due(&work_queue, now_ms, 2u);
         sleep_ms(4u);
     }

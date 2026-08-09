@@ -25,6 +25,7 @@ typedef struct picopen_shell_state {
 } picopen_shell_state_t;
 
 void picopen_shell_init(const picopen_shell_state_t *state);
+void picopen_shell_update_state(const picopen_shell_state_t *state);
 void picopen_shell_handle_key(uint8_t key);
 
 #endif

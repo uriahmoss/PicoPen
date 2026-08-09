@@ -413,6 +413,39 @@ void picopen_gui_init(const picopen_shell_state_t *state) {
     render();
 }
 
+void picopen_gui_show_boot_status(const char *stage, const char *status) {
+    picopen_display_fill_rect(0u, 0u, 320u, 320u, GUI_COLOR_BACKGROUND);
+    picopen_display_fill_rect(0u, 0u, 320u, 54u, GUI_COLOR_HEADER);
+    picopen_terminal_draw_text_at(58u, 16u, "PICOPEN", 3u,
+                                  GUI_COLOR_MAGENTA, GUI_COLOR_HEADER);
+    outline(20u, 105u, 280u, 100u, 2u, GUI_COLOR_VIOLET);
+    picopen_terminal_draw_text_at(38u, 126u,
+        stage != NULL ? stage : "STARTING", 2u, GUI_COLOR_CYAN,
+        GUI_COLOR_BACKGROUND);
+    picopen_terminal_draw_text_at(38u, 164u,
+        status != NULL ? status : "PLEASE WAIT", 1u, GUI_COLOR_MUTED,
+        GUI_COLOR_BACKGROUND);
+    picopen_terminal_draw_text_at(61u, 270u, "SECURE CORE READY", 1u,
+                                  GUI_COLOR_GOLD, GUI_COLOR_BACKGROUND);
+}
+
+void picopen_gui_update_state(const picopen_shell_state_t *state) {
+    if (state == NULL) {
+        return;
+    }
+    gui_state = *state;
+    if (screen == GUI_STATUS) {
+        render_status();
+    } else if (screen == GUI_DEVICES) {
+        render_devices();
+    } else if (screen == GUI_FILES) {
+        if (selection >= gui_state.storage.count) {
+            selection = 0u;
+        }
+        render_files();
+    }
+}
+
 void picopen_gui_handle_key(uint8_t key) {
     if (screen == GUI_TERMINAL) {
         if (key == PICOPEN_KEY_ESCAPE) {

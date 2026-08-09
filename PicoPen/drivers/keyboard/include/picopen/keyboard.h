@@ -41,6 +41,7 @@ typedef struct picopen_battery_info {
 } picopen_battery_info_t;
 
 bool picopen_keyboard_init(picopen_keyboard_info_t *info);
+bool picopen_keyboard_health_check(void);
 bool picopen_keyboard_poll(picopen_key_event_t *event);
 bool picopen_keyboard_read_battery(picopen_battery_info_t *battery);
 bool picopen_keyboard_request_shutdown(uint8_t delay_seconds);

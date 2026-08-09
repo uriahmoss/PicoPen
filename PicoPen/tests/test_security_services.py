@@ -80,6 +80,20 @@ class SecurityServiceBaselineTests(unittest.TestCase):
         self.assertIn("SCOPE OFF", gui)
         self.assertIn("LOCKED", gui)
 
+    def test_os_boot_does_not_require_usb_connection(self):
+        main = (ROOT / "os" / "src" / "main.c").read_text(encoding="utf-8")
+        self.assertNotIn("PICOPEN_OS_USB_WAIT_MS", main)
+        self.assertNotIn("PICOPEN_BOOT_ATTEMPT_USB_TIMEOUT", main)
+        self.assertIn("boot-independent", main)
+
+    def test_peripheral_recovery_is_bounded_and_updates_services(self):
+        main = (ROOT / "os" / "src" / "main.c").read_text(encoding="utf-8")
+        self.assertIn("PICOPEN_CONTROLLER_READY_MS 5000u", main)
+        self.assertIn("picopen_keyboard_health_check", main)
+        self.assertIn("picopen_device_set_state", main)
+        self.assertIn("picopen_shell_update_state", main)
+        self.assertIn("picopen_gui_update_state", main)
+
 
 if __name__ == "__main__":
     unittest.main()

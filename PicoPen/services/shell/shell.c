@@ -194,6 +194,12 @@ void picopen_shell_init(const picopen_shell_state_t *state) {
     picopen_audit_record("shell.start", true);
 }
 
+void picopen_shell_update_state(const picopen_shell_state_t *state) {
+    if (state != NULL) {
+        shell_state = *state;
+    }
+}
+
 void picopen_shell_handle_key(uint8_t key) {
     if ((key == '\n') || (key == '\r')) {
         execute();

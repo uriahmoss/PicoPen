@@ -132,8 +132,10 @@ supports 32-bit wraparound.
 
 Before every transfer, stage 1 writes a pending record to the alternate sector
 and increments the consecutive attempt count. The minimal OS writes a confirmed
-record and resets the count only after its core runtime and USB console are
-ready. A missing confirmation causes another validated attempt. Three
+record and resets the count after its core runtime and boot-metadata services
+are ready. USB CDC is optional OS I/O and is not part of the success condition;
+a battery-only PicoCalc must boot without a host connection. A missing
+confirmation causes another validated attempt. Three
 consecutive unconfirmed attempts enter recovery, where the counter and watchdog
 checkpoint are reported. A metadata write or verification failure also enters
 recovery and never transfers control.
