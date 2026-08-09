@@ -104,6 +104,29 @@ class SecurityServiceBaselineTests(unittest.TestCase):
                           "PICOPEN_CAP_TARGET_POWER", "PICOPEN_CAP_REMOTE_CONTROL"):
             self.assertNotIn(forbidden, grants)
 
+    def test_scope_indicator_is_owned_by_each_theme_renderer(self):
+        gui = (ROOT / "services" / "gui" / "gui.c").read_text(
+            encoding="utf-8"
+        )
+        synthwave = (ROOT / "services" / "appearance" /
+                     "synthwave_renderer.c").read_text(encoding="utf-8")
+        crayon = (ROOT / "services" / "appearance" /
+                  "crayon_renderer.c").read_text(encoding="utf-8")
+        self.assertRegex(gui, r"renderer_home\(labels, GUI_HOME_ITEMS, selection,\s+scope_active\)")
+        self.assertNotIn("picopen_display_fill_rect(240u, 4u, 76u, 14u", gui)
+        self.assertIn("bool scope_active", synthwave)
+        self.assertIn('scope_active ? "SCOPE ON" : "SCOPE OFF"', synthwave)
+        self.assertIn("bool scope_active", crayon)
+        self.assertIn('scope_active ? "SCOPE ON" : "SCOPE OFF"', crayon)
+
+    def test_root_file_menu_remembers_its_selection(self):
+        gui = (ROOT / "services" / "gui" / "gui.c").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("static size_t files_selection", gui)
+        self.assertIn("files_selection = selection", gui)
+        self.assertIn("files_selection < file_listing.count", gui)
+
     def test_shutdown_requires_explicit_local_confirmation(self):
         capability = (ROOT / "kernel" / "capability.c").read_text(
             encoding="utf-8"

@@ -60,7 +60,7 @@ void picopen_crayon_renderer_invalidate(void) {
 }
 
 void picopen_crayon_renderer_home(const char *const labels[], size_t count,
-                                  size_t selected) {
+                                  size_t selected, bool scope_active) {
     (void)labels;
     (void)count;
     page_valid = false;
@@ -68,6 +68,9 @@ void picopen_crayon_renderer_home(const char *const labels[], size_t count,
         0u, 0u, PICOPEN_CRAYON_SCREEN_WIDTH, PICOPEN_CRAYON_SCREEN_HEIGHT,
         picopen_crayon_screen_pixels, PICOPEN_CRAYON_SCREEN_WIDTH,
         picopen_crayon_screen_palette, PICOPEN_CRAYON_SCREEN_COLORS);
+    picopen_terminal_draw_crayon_text_transparent_at(
+        235u, 10u, scope_active ? "SCOPE ON" : "SCOPE OFF", 1u,
+        scope_active ? crayons[4] : crayons[2], crayons[0]);
     draw_home_focus(selected);
 }
 

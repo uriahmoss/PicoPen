@@ -299,7 +299,10 @@ power interruptions without corrupting its boot metadata.
     - [ ] Convert System, Files, dialogs, and detail screens
 - [ ] **Slice 3E:** Complete the responsive graphical platform bundle
   - Add reusable screen stack, panels, lists, dialogs, progress, and notices
-  - Remember the last selection independently for each menu and file list
+  - [ ] Remember the last selection independently for each menu and file list
+    - [x] Remember Home, System, and root Files selection
+    - [ ] Add a bounded navigation stack for nested directory and remaining
+      submenu selections
   - Coalesce held navigation events and measure key-to-focus latency
   - Evaluate 100 and 400 kHz keyboard operation with safe fallback
   - Redraw only changed widgets during navigation and background updates
@@ -322,12 +325,17 @@ power interruptions without corrupting its boot metadata.
       renderer modules for every built-in skin
       - [ ] Separate GUI navigation/view data from all pixel geometry
       - [x] Give Synthwave an independent neon renderer
+        - [x] Make the renderer replace its native scope label from semantic
+          state instead of accepting a second GUI overlay
       - [x] Give Crayon an independent bitmap renderer matching the approved mockup
         - [x] Add bounded indexed-color and transparent-key display blits
         - [x] Pack an authored 320x320 Crayon Home composition and bounded
           selection damage regions into firmware
         - [x] Replace procedural Home focus masks with six authored illustrated
           selection-state crops
+        - [x] Draw the scope indicator inside the trusted Crayon renderer
+          - Visual polish remains tracked in `docs/IMPROVEMENTS.md`; functional
+            state passed but the Crayon composition is not visually accepted
         - [ ] Replace generic submenu line arrays with semantic screen models
           and authored Crayon layouts for every submenu and dialog
       - [ ] Give High Contrast an independent accessibility renderer

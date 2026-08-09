@@ -85,14 +85,16 @@ void picopen_synthwave_renderer_invalidate(void) {
 }
 
 void picopen_synthwave_renderer_home(const char *const labels[], size_t count,
-                                     size_t selected) {
+                                     size_t selected, bool scope_active) {
     page_valid = false;
     grid(0u, 320u);
     picopen_display_fill_rect(0u, 0u, 320u, 44u, UINT32_C(0x12002F));
     picopen_display_fill_rect(0u, 43u, 320u, 1u, PINK_COLOR);
     text(8u, 10u, "PICOPEN", 2u, CYAN_COLOR, UINT32_C(0x12002F));
-    text(216u, 8u, "SCOPE OFF", 1u, PINK_COLOR, UINT32_C(0x12002F));
-    text(216u, 23u, "LOCKED", 1u, MUTED_COLOR, UINT32_C(0x12002F));
+    text(216u, 8u, scope_active ? "SCOPE ON" : "SCOPE OFF", 1u,
+         scope_active ? LIME_COLOR : PINK_COLOR, UINT32_C(0x12002F));
+    text(216u, 23u, scope_active ? "SESSION" : "LOCKED", 1u, MUTED_COLOR,
+         UINT32_C(0x12002F));
     for (size_t index = 0u; index < count; ++index) {
         tile(labels[index], index, index == selected);
     }

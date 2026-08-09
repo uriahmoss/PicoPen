@@ -55,6 +55,7 @@ static gui_screen_t screen;
 static size_t selection;
 static size_t home_selection;
 static size_t system_selection;
+static size_t files_selection;
 static picopen_storage_listing_t file_listing;
 static char file_path[PICOPEN_STORAGE_PATH_SIZE];
 static char engagement_reference[PICOPEN_ENGAGEMENT_REFERENCE_SIZE];
@@ -319,27 +320,17 @@ static void render_home(void) {
     static const char *const labels[GUI_HOME_ITEMS] = {
         "STATUS", "FILES", "DEVICES", "WORKBENCH", "AUDIT", "SYSTEM",
     };
+    const bool scope_active = picopen_engagement_session_active(
+        time_us_64() / 1000u);
     if (picopen_skin_current_id() == PICOPEN_SKIN_CRAYON) {
-        picopen_crayon_renderer_home(labels, GUI_HOME_ITEMS, selection);
-        const bool active = picopen_engagement_session_active(
-            time_us_64() / 1000u);
-        picopen_display_fill_rect(240u, 4u, 76u, 14u,
-                                  active ? 0x145A32u : 0x501020u);
-        picopen_terminal_draw_text_at(246u, 7u,
-            active ? "SCOPE ON" : "SCOPE OFF", 1u, 0xFFFFFFu,
-            active ? 0x145A32u : 0x501020u);
+        picopen_crayon_renderer_home(labels, GUI_HOME_ITEMS, selection,
+                                     scope_active);
         rendered_page_valid = false;
         return;
     }
     if (picopen_skin_current_id() == PICOPEN_SKIN_SYNTHWAVE) {
-        picopen_synthwave_renderer_home(labels, GUI_HOME_ITEMS, selection);
-        const bool active = picopen_engagement_session_active(
-            time_us_64() / 1000u);
-        picopen_display_fill_rect(240u, 4u, 76u, 14u,
-                                  active ? 0x145A32u : 0x501020u);
-        picopen_terminal_draw_text_at(246u, 7u,
-            active ? "SCOPE ON" : "SCOPE OFF", 1u, 0xFFFFFFu,
-            active ? 0x145A32u : 0x501020u);
+        picopen_synthwave_renderer_home(labels, GUI_HOME_ITEMS, selection,
+                                        scope_active);
         rendered_page_valid = false;
         return;
     }
@@ -365,8 +356,7 @@ static void render_home(void) {
     draw_skin_text(8u, 10u, "PICOPEN", 2u, skin->text, skin->header);
     draw_skin_text(176u, 8u, "SD RO", 1u, skin->accents[5], skin->header);
     draw_skin_text(216u, 8u,
-                   picopen_engagement_session_active(time_us_64() / 1000u)
-                       ? "SCOPE ON" : "SCOPE OFF",
+                   scope_active ? "SCOPE ON" : "SCOPE OFF",
                    1u, skin->accents[1], skin->header);
     draw_skin_text(216u, 23u, "LOCKED", 1u, skin->muted, skin->header);
     for (size_t index = 0u; index < GUI_HOME_ITEMS; ++index) {
@@ -651,7 +641,13 @@ static void open_home_item(void) {
     };
     home_selection = selection;
     screen = screens[selection];
-    selection = screen == GUI_SYSTEM ? system_selection : 0u;
+    if (screen == GUI_SYSTEM) {
+        selection = system_selection;
+    } else if (screen == GUI_FILES) {
+        selection = files_selection < file_listing.count ? files_selection : 0u;
+    } else {
+        selection = 0u;
+    }
     render();
 }
 
@@ -697,6 +693,7 @@ void picopen_gui_init(const picopen_shell_state_t *state) {
     selection = 0u;
     home_selection = 0u;
     system_selection = 0u;
+    files_selection = 0u;
     picopen_audit_record("gui.start", true);
     render();
 }
@@ -789,6 +786,9 @@ void picopen_gui_handle_key(uint8_t key) {
             return;
         }
         const gui_screen_t previous_screen = screen;
+        if ((previous_screen == GUI_FILES) && (strcmp(file_path, "/") == 0)) {
+            files_selection = selection;
+        }
         screen = parent_screen(screen);
         if ((screen == GUI_FILES) && (selection >= file_listing.count)) {
             selection = 0u;
@@ -827,6 +827,7 @@ void picopen_gui_handle_key(uint8_t key) {
         const size_t count = file_listing.count;
         if ((key == PICOPEN_KEY_UP) && (selection > 0u)) --selection;
         if ((key == PICOPEN_KEY_DOWN) && (selection + 1u < count)) ++selection;
+        files_selection = selection;
         if ((key == PICOPEN_KEY_ENTER) && (count != 0u)) {
             const picopen_storage_entry_t *const entry =
                 &file_listing.entries[selection];
