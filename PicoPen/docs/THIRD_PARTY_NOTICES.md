@@ -13,9 +13,18 @@ listed separately and is not a PicoPen dependency.
   integration
 - Pin: recorded in `tools/dependencies.lock`
 
+### FatFs R0.15
+
+- Author: ChaN
+- License: FatFs permissive license retained in the vendored source headers
+- Source snapshot: `oyama/pico-vfs` commit
+  `4b71f274acae7de9a3696d3345992294fa9e034e`
+- Purpose: read-only FAT volume and directory parsing
+- PicoPen configuration: writes, mkfs, chmod, labels, expansion, exFAT, long
+  filenames, and dynamic LFN allocation disabled
+
 ## Approved for future integration
 
-- FatFs R0.15: read-only removable FAT support; FatFs permissive license
 - littlefs: internal settings and audit journal; BSD 3-Clause
 - LVGL: graphical interface toolkit; MIT
 

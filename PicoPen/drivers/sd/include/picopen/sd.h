@@ -36,6 +36,9 @@ typedef struct picopen_sd_info {
 // Initializes and identifies the built-in SD card in SPI mode. This interface
 // intentionally exposes no block-write, erase, or formatting operation.
 bool picopen_sd_identify(picopen_sd_info_t *info);
+bool picopen_sd_read_blocks(uint32_t first_lba, uint8_t *buffer,
+                            uint32_t block_count);
+void picopen_sd_close(void);
 const char *picopen_sd_status_name(picopen_sd_status_t status);
 const char *picopen_sd_filesystem_name(picopen_sd_filesystem_t filesystem);
 

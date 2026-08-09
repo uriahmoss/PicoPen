@@ -1,8 +1,15 @@
 add_executable(picopen_os
+    ../kernel/capability.c
+    ../kernel/work_queue.c
     ../drivers/display/display.c
     ../drivers/keyboard/keyboard.c
     ../drivers/sd/sd.c
     ../drivers/terminal/terminal.c
+    ../services/storage/fatfs_diskio.c
+    ../services/storage/storage.c
+    ../services/shell/shell.c
+    ../services/audit/audit.c
+    ../third_party/fatfs/ff.c
     src/main.c
 )
 
@@ -18,10 +25,15 @@ target_link_libraries(picopen_os PRIVATE
 )
 target_include_directories(picopen_os PRIVATE
     ${PROJECT_SOURCE_DIR}/boards/picocalc_pico2w/include
+    ${PROJECT_SOURCE_DIR}/kernel/include
     ${PROJECT_SOURCE_DIR}/drivers/display/include
     ${PROJECT_SOURCE_DIR}/drivers/keyboard/include
     ${PROJECT_SOURCE_DIR}/drivers/sd/include
     ${PROJECT_SOURCE_DIR}/drivers/terminal/include
+    ${PROJECT_SOURCE_DIR}/services/storage/include
+    ${PROJECT_SOURCE_DIR}/services/shell/include
+    ${PROJECT_SOURCE_DIR}/services/audit/include
+    ${PROJECT_SOURCE_DIR}/third_party/fatfs
 )
 target_compile_definitions(picopen_os PRIVATE
     PICO_CRT0_INCLUDE_PICOBIN_ENTRY_POINT_ITEM=1

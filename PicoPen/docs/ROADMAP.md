@@ -149,6 +149,10 @@ identity, while invalid images enter a recoverable state.
     - Hardware evidence: the CPI 2.0 unit read the first partition boot sector,
       identified FAT at LBA 2048, and continued accepting keyboard input.
 - [ ] Battery status and controlled shutdown
+  - [x] Read and display bounded battery percentage and charging state
+    - Hardware evidence: the accelerated baseline booted with the keyboard,
+      storage, battery diagnostic, and interactive terminal functioning.
+  - [ ] Add a locally confirmed controlled-shutdown path
 - [ ] PSRAM test and allocator
 
 Exit condition: an interactive terminal survives repeated cold boots and forced
@@ -161,12 +165,16 @@ power interruptions without corrupting its boot metadata.
   - [x] Keep the PicoPen lightweight kernel and PicoPen-owned policy boundaries
   - [x] Define deny-by-default capabilities and secure failure behavior
   - [x] Add automated dependency provenance and license checks
-- [ ] **Slice 3B:** Integrate pinned FatFs R0.15 in read-only mode
-  - Compile out create, write, delete, rename, format, and free-space mutation
-  - Route block reads through the bounded PicoPen SD service
-  - Treat names, directory entries, partition data, and file contents as
+- [x] **Slice 3B:** Integrate pinned FatFs R0.15 in read-only mode
+  - [x] Compile out create, write, delete, rename, format, and free-space
+    mutation
+  - [x] Route block reads through the bounded PicoPen SD service
+  - [x] Treat names, directory entries, partition data, and file contents as
     untrusted and enforce path, depth, size, and iteration limits
-  - List a physical card's root directory without auto-running content
+  - [x] List a physical card's root directory without auto-running content
+    - Hardware evidence: the CPI 2.0 unit mounted the existing FAT card
+      read-only and the bounded `ls` command listed root entries without
+      disrupting keyboard input.
 - [ ] **Slice 3C:** Add the versioned storage service
   - Separate removable read access, evidence export, and privileged mutation
   - Require explicit capability and local policy for every SD write
@@ -175,9 +183,24 @@ power interruptions without corrupting its boot metadata.
   - Keep secrets in a separately designed encrypted vault
   - Test interrupted updates and full-media behavior
 - [ ] Work queues, timers, IPC, and capability checks
+  - [x] Add a fixed-capacity deadline queue with per-loop execution budgets
+  - [x] Add named deny-by-default capability evaluation
+  - [ ] Add versioned IPC messages and service ownership
 - [ ] Device manager and attachment descriptors
 - [ ] Filesystem, settings, audit, and engagement-scope services
 - [ ] Crash reporting and recovery UI
+- [ ] Structured audit service
+  - [x] Add a bounded monotonic in-memory audit ring with no secret payloads
+  - [ ] Persist authenticated audit records after the littlefs layout is
+    reviewed
+- [ ] Interactive terminal baseline
+  - [x] Add bounded `help`, `status`, `devices`, `ls`, `security`, and `audit`
+    commands
+  - [x] Verify commands and keyboard responsiveness on hardware
+  - [x] Verify bottom-row scrolling and whole-word wrapping on hardware
+    - Hardware evidence: the accelerated command baseline operated on the
+      physical unit; the follow-on terminal build scrolls at row 20 and wraps
+      complete words when they fit within the 40-column line.
 - [ ] Integrate pinned LVGL behind the PicoPen compositor and input services
 - [ ] Use Pico SDK-pinned TinyUSB and networking stacks behind capability checks
 

@@ -26,7 +26,13 @@ typedef struct picopen_keyboard_info {
     bool scl_high;
 } picopen_keyboard_info_t;
 
+typedef struct picopen_battery_info {
+    uint8_t percent;
+    bool charging;
+} picopen_battery_info_t;
+
 bool picopen_keyboard_init(picopen_keyboard_info_t *info);
 bool picopen_keyboard_poll(picopen_key_event_t *event);
+bool picopen_keyboard_read_battery(picopen_battery_info_t *battery);
 
 #endif

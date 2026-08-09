@@ -47,6 +47,31 @@ class DependencyManifestTests(unittest.TestCase):
         self.assertIn(f"PICO_SDK_REPOSITORY={pico_sdk['source']}", lock_text)
         self.assertIn(f"PICO_SDK_VERSION={pico_sdk['pin']}", lock_text)
 
+    def test_fatfs_is_compiled_read_only(self):
+        config = (ROOT / "third_party" / "fatfs" / "ffconf.h").read_text(
+            encoding="utf-8"
+        )
+        required = {
+            "FF_FS_READONLY": "1",
+            "FF_USE_MKFS": "0",
+            "FF_USE_CHMOD": "0",
+            "FF_USE_LABEL": "0",
+            "FF_USE_EXPAND": "0",
+            "FF_USE_LFN": "0",
+        }
+        for name, value in required.items():
+            with self.subTest(option=name):
+                self.assertRegex(config, rf"#define\s+{name}\s+{value}\b")
+
+    def test_fatfs_pin_matches_build_lock(self):
+        lock_text = LOCK.read_text(encoding="utf-8")
+        fatfs = next(
+            component for component in self.components
+            if component["name"] == "FatFs"
+        )
+        self.assertIn(f"FATFS_SOURCE_REPOSITORY={fatfs['source']}", lock_text)
+        self.assertIn(f"FATFS_SOURCE_COMMIT={fatfs['pin']}", lock_text)
+
 
 if __name__ == "__main__":
     unittest.main()

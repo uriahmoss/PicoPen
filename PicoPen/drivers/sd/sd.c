@@ -19,6 +19,7 @@
 #define SD_DATA_TIMEOUT_MS    500u
 #define SD_POWER_STABILIZATION_MS 1500u
 #define SD_SECTOR_SIZE        512u
+#define SD_MAX_READ_BLOCKS    4u
 
 #define SD_COMMAND_GO_IDLE       0u
 #define SD_COMMAND_SEND_IF_COND  8u
@@ -40,6 +41,8 @@
 
 static spi_inst_t *const sd_spi = spi0;
 static bool software_spi;
+static bool transport_ready;
+static bool transport_high_capacity;
 
 static uint8_t crc7(const uint8_t *bytes, size_t length) {
     const uint8_t polynomial = 0x89u;
@@ -114,6 +117,7 @@ static void finish_transport(void) {
     if (!software_spi) {
         spi_deinit(sd_spi);
     }
+    transport_ready = false;
 }
 
 static uint8_t command_begin(uint8_t index, uint32_t argument) {
@@ -306,6 +310,7 @@ bool picopen_sd_identify(picopen_sd_info_t *info) {
     *info = (picopen_sd_info_t){0};
     info->last_response = SD_R1_NO_RESPONSE;
     software_spi = false;
+    transport_ready = false;
 
     gpio_init(PICOPEN_SD_DETECT_PIN);
     gpio_set_dir(PICOPEN_SD_DETECT_PIN, GPIO_IN);
@@ -366,8 +371,32 @@ bool picopen_sd_identify(picopen_sd_info_t *info) {
         return false;
     }
     info->status = PICOPEN_SD_READY;
-    finish_transport();
+    transport_high_capacity = info->high_capacity;
+    transport_ready = true;
     return true;
+}
+
+bool picopen_sd_read_blocks(uint32_t first_lba, uint8_t *buffer,
+                            uint32_t block_count) {
+    if (!transport_ready || (buffer == NULL) || (block_count == 0u) ||
+        (block_count > SD_MAX_READ_BLOCKS) ||
+        (first_lba > UINT32_MAX - (block_count - 1u))) {
+        return false;
+    }
+    for (uint32_t index = 0u; index < block_count; ++index) {
+        uint8_t response = SD_R1_NO_RESPONSE;
+        if (!read_sector(first_lba + index, transport_high_capacity,
+                         &buffer[index * SD_SECTOR_SIZE], &response)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void picopen_sd_close(void) {
+    if (transport_ready) {
+        finish_transport();
+    }
 }
 
 const char *picopen_sd_status_name(picopen_sd_status_t status) {

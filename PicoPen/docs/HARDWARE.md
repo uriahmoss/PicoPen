@@ -65,6 +65,18 @@ partition boot sector, identifying a FAT filesystem beginning at LBA 2048.
 Keyboard input remained responsive after the probe. The implementation mounts
 nothing and contains no block-write, erase, or formatting interface.
 
+The next storage diagnostic uses FatFs R0.15 with all mutation APIs compiled
+out. It mounts only long enough to enumerate at most eight short-name root
+entries, never opens file content, never auto-runs SD content, and unmounts
+before entering the interactive loop. The physical CPI 2.0 unit successfully
+listed the existing FAT card's root entries while keyboard input remained
+responsive.
+
+The accelerated terminal baseline also passed interactive hardware use. Its
+fixed 40 x 20 cell buffer now scrolls upward at the bottom row and moves a whole
+word to the next row when it fits, retaining hard wrapping only for tokens
+longer than the terminal width.
+
 The V2.0 schematic powers SD VDD from the PMIC-controlled ALDO1 rail rather
 than the Pico's 3V3 output. ClockworkPi's pinned SD booter waits 1.5 seconds
 after active-low card detection before starting SPI; PicoPen mirrors that

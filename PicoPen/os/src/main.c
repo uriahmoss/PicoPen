@@ -10,14 +10,31 @@
 
 #include "picopen/boot_format.h"
 #include "picopen/boot_metadata.h"
+#include "picopen/audit.h"
+#include "picopen/capability.h"
 #include "picopen/display.h"
 #include "picopen/keyboard.h"
 #include "picopen/sd.h"
+#include "picopen/shell.h"
+#include "picopen/storage.h"
 #include "picopen/terminal.h"
+#include "picopen/work_queue.h"
 
 #ifndef PICOPEN_VERSION
 #define PICOPEN_VERSION "unknown"
 #endif
+
+typedef struct heartbeat_context {
+    picopen_work_queue_t *queue;
+} heartbeat_context_t;
+
+static void heartbeat(void *context_pointer) {
+    heartbeat_context_t *const context = context_pointer;
+    const uint64_t now_ms = time_us_64() / 1000u;
+    printf("os-heartbeat: %llu ms\r\n", now_ms);
+    (void)picopen_work_schedule(context->queue, now_ms + 5000u, heartbeat,
+                                context);
+}
 
 int main(void) {
     watchdog_hw->scratch[PICOPEN_BOOT_ATTEMPT_SCRATCH] =
@@ -57,6 +74,7 @@ int main(void) {
     }
     watchdog_hw->scratch[PICOPEN_BOOT_ATTEMPT_SCRATCH] = 0u;
     watchdog_disable();
+    picopen_audit_init();
 
     printf("\r\nPicoPen minimal OS\r\n");
     printf("version: %s\r\n", PICOPEN_VERSION);
@@ -76,8 +94,14 @@ int main(void) {
     const bool display_ready = picopen_display_init();
     picopen_keyboard_info_t keyboard_info;
     const bool keyboard_ready = picopen_keyboard_init(&keyboard_info);
+    picopen_battery_info_t battery_info = {0};
+    const bool battery_ready =
+        keyboard_ready && picopen_keyboard_read_battery(&battery_info);
     picopen_sd_info_t sd_info;
     const bool sd_ready = picopen_sd_identify(&sd_info);
+    picopen_storage_listing_t storage_listing = {0};
+    const bool storage_ready =
+        sd_ready && picopen_storage_list_root(&storage_listing);
     if (display_ready) {
         char keyboard_status[40];
         char sd_status[40];
@@ -114,6 +138,25 @@ int main(void) {
             "STATUS: MINIMAL OS RUNNING\n");
         picopen_terminal_write(keyboard_status);
         picopen_terminal_write(sd_status);
+        if (battery_ready) {
+            char battery_status[40];
+            snprintf(battery_status, sizeof(battery_status),
+                     "BATTERY: %u%%%s\n", battery_info.percent,
+                     battery_info.charging ? " CHARGING" : "");
+            picopen_terminal_write(battery_status);
+        } else {
+            picopen_terminal_write("BATTERY: UNAVAILABLE\n");
+        }
+        if (storage_ready) {
+            char storage_status[40];
+            snprintf(storage_status, sizeof(storage_status),
+                     "ROOT: %u ENTRIES%s\n",
+                     (unsigned int)storage_listing.count,
+                     storage_listing.truncated ? "+" : "");
+            picopen_terminal_write(storage_status);
+        } else {
+            picopen_terminal_write("ROOT: UNAVAILABLE\n");
+        }
         picopen_terminal_write("\n> ");
         picopen_terminal_render();
     }
@@ -139,34 +182,47 @@ int main(void) {
            sd_info.partitioned ? 1u : 0u,
            (unsigned long)sd_info.first_partition_lba,
            picopen_sd_filesystem_name(sd_info.filesystem));
+    printf("storage: %s; result=%d; entries=%u; truncated=%u\r\n",
+           storage_ready ? "ready" : "unavailable", storage_listing.result,
+           (unsigned int)storage_listing.count,
+           storage_listing.truncated ? 1u : 0u);
+    printf("battery: %s; percent=%u; charging=%u\r\n",
+           battery_ready ? "ready" : "unavailable",
+           battery_ready ? battery_info.percent : 0u,
+           battery_ready && battery_info.charging ? 1u : 0u);
+    for (size_t index = 0u; storage_ready && index < storage_listing.count;
+         ++index) {
+        printf("root[%u]: %s%s\r\n", (unsigned int)index,
+               storage_listing.entries[index].name,
+               storage_listing.entries[index].directory ? "/" : "");
+    }
+
+    const picopen_shell_state_t shell_state = {
+        .keyboard_ready = keyboard_ready,
+        .battery_ready = battery_ready,
+        .storage_ready = storage_ready,
+        .battery = battery_info,
+        .sd = sd_info,
+        .storage = storage_listing,
+        .security = picopen_security_default(),
+    };
+    picopen_shell_init(&shell_state);
+
+    picopen_work_queue_t work_queue;
+    picopen_work_queue_init(&work_queue);
+    heartbeat_context_t heartbeat_context = {.queue = &work_queue};
+    (void)picopen_work_schedule(&work_queue, time_us_64() / 1000u, heartbeat,
+                                &heartbeat_context);
 
     for (;;) {
         picopen_key_event_t event;
-        if (keyboard_ready && picopen_keyboard_poll(&event) &&
+        if (display_ready && keyboard_ready && picopen_keyboard_poll(&event) &&
             (event.state == PICOPEN_KEY_PRESSED)) {
-            char key_text[8];
-            if ((event.key >= 0x20u) && (event.key <= 0x7Eu)) {
-                key_text[0] = (char)event.key;
-                key_text[1] = '\0';
-            } else if (event.key == 0x0Au) {
-                key_text[0] = '\n';
-                key_text[1] = '\0';
-            } else if (event.key == 0x08u) {
-                key_text[0] = '\b';
-                key_text[1] = '\0';
-            } else {
-                snprintf(key_text, sizeof(key_text), "[%02X]", event.key);
-            }
-            picopen_terminal_write(key_text);
-            picopen_terminal_render();
+            picopen_shell_handle_key(event.key);
             printf("key: 0x%02x state=%u\r\n", event.key, event.state);
         }
-        static uint64_t next_heartbeat_ms = 0u;
         const uint64_t now_ms = time_us_64() / 1000u;
-        if (now_ms >= next_heartbeat_ms) {
-            printf("os-heartbeat: %llu ms\r\n", now_ms);
-            next_heartbeat_ms = now_ms + 5000u;
-        }
+        (void)picopen_work_run_due(&work_queue, now_ms, 2u);
         sleep_ms(4u);
     }
 }

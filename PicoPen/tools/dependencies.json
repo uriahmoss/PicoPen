@@ -11,9 +11,9 @@
     },
     {
       "name": "FatFs",
-      "status": "approved",
-      "source": "http://elm-chan.org/fsw/ff/",
-      "pin": "R0.15",
+      "status": "incorporated",
+      "source": "https://github.com/oyama/pico-vfs.git",
+      "pin": "4b71f274acae7de9a3696d3345992294fa9e034e",
       "license": "FatFs",
       "purpose": "Read-only removable FAT filesystem support"
     },

@@ -29,6 +29,20 @@ static uint8_t rendered_cursor_column;
 static uint8_t rendered_cursor_row;
 static bool rendered_cursor_valid;
 
+static void scroll_up(void) {
+    for (size_t row = 1u; row < TERMINAL_ROWS; ++row) {
+        for (size_t column = 0u; column < TERMINAL_COLUMNS; ++column) {
+            cells[row - 1u][column].character = cells[row][column].character;
+            cells[row - 1u][column].dirty = true;
+        }
+    }
+    for (size_t column = 0u; column < TERMINAL_COLUMNS; ++column) {
+        cells[TERMINAL_ROWS - 1u][column].character = ' ';
+        cells[TERMINAL_ROWS - 1u][column].dirty = true;
+    }
+    rendered_cursor_valid = false;
+}
+
 static const uint8_t glyphs[64][GLYPH_HEIGHT] = {
     ['!'-' '] = {4, 4, 4, 4, 4, 0, 4},
     ['"'-' '] = {10, 10, 10, 0, 0, 0, 0},
@@ -99,7 +113,17 @@ static void newline(void) {
     cursor_column = 0u;
     if (cursor_row + 1u < TERMINAL_ROWS) {
         ++cursor_row;
+        return;
     }
+    scroll_up();
+}
+
+static size_t word_length(const char *text) {
+    size_t length = 0u;
+    while ((text[length] >= '!') && (text[length] <= '~')) {
+        ++length;
+    }
+    return length;
 }
 
 static const uint8_t *glyph_for(char character) {
@@ -175,6 +199,14 @@ void picopen_terminal_write(const char *text) {
         }
         if ((*text < ' ') || (*text > '~')) {
             continue;
+        }
+        if (*text != ' ') {
+            const size_t length = word_length(text);
+            const size_t remaining = TERMINAL_COLUMNS - cursor_column;
+            if ((cursor_column != 0u) && (length <= TERMINAL_COLUMNS) &&
+                (length > remaining)) {
+                newline();
+            }
         }
         cells[cursor_row][cursor_column].character = *text;
         cells[cursor_row][cursor_column].dirty = true;

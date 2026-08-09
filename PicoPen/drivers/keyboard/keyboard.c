@@ -12,6 +12,9 @@
 #define KEYBOARD_RESPONSE_MS   16u
 #define KEYBOARD_REGISTER_VERSION 0x01u
 #define KEYBOARD_REGISTER_FIFO    0x09u
+#define KEYBOARD_REGISTER_BATTERY 0x0Bu
+#define KEYBOARD_BATTERY_CHARGING 0x80u
+#define KEYBOARD_BATTERY_PERCENT  0x7Fu
 #define I2C_SCAN_FIRST_ADDRESS     0x08u
 #define I2C_SCAN_LAST_ADDRESS      0x77u
 #define I2C_SCAN_TIMEOUT_US        2000u
@@ -104,5 +107,24 @@ bool picopen_keyboard_poll(picopen_key_event_t *event) {
     }
     event->state = (picopen_key_state_t)response[0];
     event->key = response[1];
+    return true;
+}
+
+bool picopen_keyboard_read_battery(picopen_battery_info_t *battery) {
+    if (!initialized || (battery == NULL)) {
+        return false;
+    }
+    uint8_t response[2] = {0u, 0u};
+    if (!read_register(KEYBOARD_REGISTER_BATTERY, response) ||
+        (response[0] != KEYBOARD_REGISTER_BATTERY)) {
+        return false;
+    }
+    const uint8_t percent = response[1] & KEYBOARD_BATTERY_PERCENT;
+    if (percent > 100u) {
+        return false;
+    }
+    battery->percent = percent;
+    battery->charging =
+        (response[1] & KEYBOARD_BATTERY_CHARGING) != 0u;
     return true;
 }
