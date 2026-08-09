@@ -10,8 +10,10 @@ bootloader.
    Audit, and System.
 4. Confirm each panel has a small geometric icon and legible two-times-scale
    label without clipping or overlap.
-5. Use all four arrow keys. The selected panel must receive a thicker bright
-   cyan border and navigation must remain inside the six-item grid.
+5. Use all four arrow keys. Only the previous and newly selected panels should
+   redraw; the header, footer, and other four panels must remain stable. The
+   selected panel must use the thicker bright lime focus color, which appears
+   nowhere else in the palette, and navigation must remain inside the grid.
 6. Confirm the footer remains visible and reads `ARROWS MOVE`, `ENTER SELECT`,
    and `ESC BACK`.
 7. Open every panel. Existing interior screens and their Escape behavior must

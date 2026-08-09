@@ -11,6 +11,39 @@
 - [x] Decide the first flash layout
 - [ ] Select the production signature scheme and key-storage policy
 
+## Accelerated delivery bundles
+
+PicoPen groups independent, conventional OS mechanisms into larger hardware
+test images. A bundle may cross milestone headings when its components share no
+unresolved security or hardware dependency. Signing policy, flash-layout
+changes, persistent secrets, storage mutation, and active transmission remain
+review gates and are never implied by acceleration.
+
+- [ ] **Bundle A: standalone graphical platform**
+  - Battery-only, USB-only, and mixed-power boot without cable-order rituals
+  - Optional hot-pluggable USB serial instead of a boot dependency
+  - Bounded peripheral readiness, retry, and dynamic device-state updates
+  - Partial graphical redraws and measured input latency
+  - Synthwave System, Files, status, dialog, and recovery screens
+  - Battery warnings, backlight control, and locally confirmed shutdown
+- [ ] **Bundle B: passive security workbench**
+  - Engagement-scope editor and persistent scope/security indicators
+  - Receive-only GPIO, ADC, I2C, SPI, UART, and attachment inventory
+  - Bounded jobs, progress, cancellation, errors, and structured audit events
+  - Read-only directory traversal, metadata, text, and hexadecimal viewers
+  - No GPIO drive, target power, emulation, probing, or transmission
+- [ ] **Bundle C: Wi-Fi and update transport foundation**
+  - Wi-Fi disabled by default with locally approved connection management
+  - Passive access-point inventory and interface diagnostics
+  - Locked online update and both locally launched portal modes
+  - Bounded package streaming and shared validation interfaces
+  - No installation until signature and inactive-slot contracts are approved
+- [ ] **Bundle D: signed and recoverable software update**
+  - Approved package signature, key rotation, anti-rollback, and flash layout
+  - Online signed-manifest checking and locally approved download
+  - Current-Wi-Fi and private-network upload portals
+  - Inactive-slot staging, independent boot validation, and automatic rollback
+
 ## Milestone 1: first boot
 
 - [x] Add the initial CMake/Pico SDK build
@@ -157,6 +190,16 @@ identity, while invalid images enter a recoverable state.
       within 15 seconds and uses the controller's bounded six-second delay.
     - Hardware power-off verification remains part of the next baseline test.
 - [ ] PSRAM test and allocator
+- [ ] **Slice 2B:** Make PicoCalc boot and peripheral discovery power-order safe
+  - Remove USB CDC connection as an OS boot-success requirement
+  - Allow USB serial to attach and detach without changing device readiness
+  - Show bounded graphical boot progress while board services stabilize
+  - Retry keyboard and battery discovery before declaring them unavailable
+  - Initialize SD only after keyboard/PMIC readiness and rail stabilization
+  - Retry failed peripherals in the background without blocking the GUI
+  - Update device-manager states when hardware disappears or recovers
+  - Verify battery-only, USB-only, warm-reset, cold-boot, and cable hot-plug paths
+  - Eliminate the full-power-removal and delayed-USB workaround
 
 Exit condition: an interactive terminal survives repeated cold boots and forced
 power interruptions without corrupting its boot metadata.
@@ -224,7 +267,16 @@ power interruptions without corrupting its boot metadata.
   - [ ] Replace text tiles with compositor-drawn synthwave widgets
     - [x] Add bounded scaled pixel-text and reusable panel primitives
     - [x] Convert Home to direct synthwave panels, icons, and focus borders
+    - [x] Redraw only changed Home tiles and use a focus-exclusive color
     - [ ] Convert System, Files, dialogs, and detail screens
+- [ ] **Slice 3E:** Complete the responsive graphical platform bundle
+  - Add reusable screen stack, panels, lists, dialogs, progress, and notices
+  - Coalesce held navigation events and measure key-to-focus latency
+  - Evaluate 100 and 400 kHz keyboard operation with safe fallback
+  - Redraw only changed widgets during navigation and background updates
+  - Add graphical device-recovery, crash-summary, and degraded-mode screens
+  - Add idle timeout, backlight settings, battery warning, and power controls
+  - Preserve Advanced Terminal as a policy-equivalent application
 - [ ] Integrate pinned LVGL behind the PicoPen compositor and input services
 - [ ] Use Pico SDK-pinned TinyUSB and networking stacks behind capability checks
 
@@ -239,12 +291,38 @@ power interruptions without corrupting its boot metadata.
 ## Milestone 5: networking
 
 - [ ] Wi-Fi management and network diagnostics
+  - Keep Wi-Fi disabled until locally enabled
+  - Add saved-network selection without plaintext credentials or logs
+  - Add passive access-point, signal, channel, and interface status views
+  - Separate connection, passive observation, and active probing capabilities
 - [ ] Secure Wi-Fi software update
   - [ ] Approve the production signature and key-rotation policy
   - [ ] Approve an inactive update-slot and rollback flash layout
-  - [ ] Fetch a bounded signed manifest over authenticated TLS
-  - [ ] Verify board, version, bounds, digest, and signature before staging
-  - [ ] Require local approval before download, installation, and reboot
+  - [ ] Define one signed package format shared by every update transport
+    - Include format version, hardware target, OS version, security rollback
+      version, payload size, SHA-256 digest, release metadata, and signature
+    - Never treat a raw UF2 upload as an authorized update
+  - [ ] Add online update mode
+    - Fetch a bounded signed manifest over authenticated TLS
+    - Permit automatic checking but default installation to manual approval
+    - Verify board, version, bounds, digest, and signature before staging
+  - [ ] Add locally launched portal on the current known Wi-Fi network
+    - Display the exact local address and a random single-use pairing code
+    - Bind only to the local interface; never enable UPnP or port forwarding
+    - Allow one authenticated client and expire after a bounded interval
+    - Warn the user to activate this mode only on a trusted local network
+  - [ ] Add locally launched private update-network portal
+    - Create an isolated temporary access point with a random password
+    - Display network, address, pairing code, and expiration locally
+    - Require no internet connection and stop the access point after use
+  - [ ] Harden both portal modes
+    - Start only from the local Software Update menu
+    - Rate-limit authentication and reject cross-site browser requests
+    - Stream one size-limited package in bounded chunks to the inactive slot
+    - Expose no shell, filesystem browser, or general configuration endpoint
+    - Shut down on completion, cancellation, timeout, or client-policy failure
+  - [ ] Require separate local approval before download, staging, and reboot
+  - [ ] Record sanitized update status and audit references without secrets
   - [ ] Let the bootloader independently validate and roll back failed boots
 - [ ] Scoped TCP service identification
 - [ ] HTTP and TLS inspection

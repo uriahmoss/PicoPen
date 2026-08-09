@@ -75,7 +75,8 @@ class SecurityServiceBaselineTests(unittest.TestCase):
         )
         self.assertIn("scale > 4u", terminal)
         self.assertIn("graphical_tile", gui)
-        self.assertIn("GUI_COLOR_CYAN", gui)
+        self.assertIn("GUI_COLOR_FOCUS", gui)
+        self.assertIn("redraw_home_focus", gui)
         self.assertIn("SCOPE OFF", gui)
         self.assertIn("LOCKED", gui)
 

@@ -22,6 +22,7 @@
 #define GUI_COLOR_VIOLET     UINT32_C(0x8B5CF6)
 #define GUI_COLOR_ORANGE     UINT32_C(0xFF8A30)
 #define GUI_COLOR_GOLD       UINT32_C(0xFFCC00)
+#define GUI_COLOR_FOCUS      UINT32_C(0x7CFF00)
 #define GUI_COLOR_MUTED      UINT32_C(0x7590B8)
 
 typedef enum gui_screen {
@@ -135,13 +136,12 @@ static void tile_icon(size_t index, uint16_t center_x, uint16_t y,
 }
 
 static void graphical_tile(size_t index, const char *label, uint16_t x,
-                           uint16_t y) {
+                           uint16_t y, bool focused) {
     static const uint32_t accents[GUI_HOME_ITEMS] = {
         GUI_COLOR_MAGENTA, GUI_COLOR_CYAN, GUI_COLOR_CYAN,
         GUI_COLOR_VIOLET, GUI_COLOR_MAGENTA, GUI_COLOR_ORANGE,
     };
-    const bool focused = selection == index;
-    const uint32_t accent = focused ? GUI_COLOR_CYAN : accents[index];
+    const uint32_t accent = focused ? GUI_COLOR_FOCUS : accents[index];
     picopen_display_fill_rect(x, y, 148u, 66u, GUI_COLOR_PANEL);
     outline(x, y, 148u, 66u, focused ? 3u : 2u, accent);
     tile_icon(index, (uint16_t)(x + 74u), (uint16_t)(y + 8u), accent);
@@ -170,7 +170,7 @@ static void render_home(void) {
     for (size_t index = 0u; index < GUI_HOME_ITEMS; ++index) {
         const uint16_t x = (index & 1u) == 0u ? 8u : 164u;
         const uint16_t y = (uint16_t)(50u + (index / 2u) * 76u);
-        graphical_tile(index, labels[index], x, y);
+        graphical_tile(index, labels[index], x, y, selection == index);
     }
     picopen_display_fill_rect(0u, 282u, 320u, 38u, GUI_COLOR_HEADER);
     picopen_display_fill_rect(0u, 282u, 320u, 1u, GUI_COLOR_VIOLET);
@@ -180,6 +180,18 @@ static void render_home(void) {
                                   GUI_COLOR_CYAN, GUI_COLOR_HEADER);
     picopen_terminal_draw_text_at(244u, 294u, "ESC BACK", 1u,
                                   GUI_COLOR_VIOLET, GUI_COLOR_HEADER);
+}
+
+static void redraw_home_focus(size_t previous, size_t current) {
+    static const char *const labels[GUI_HOME_ITEMS] = {
+        "STATUS", "FILES", "DEVICES", "WORKBENCH", "AUDIT", "SYSTEM",
+    };
+    const uint16_t previous_x = (previous & 1u) == 0u ? 8u : 164u;
+    const uint16_t previous_y = (uint16_t)(50u + (previous / 2u) * 76u);
+    const uint16_t current_x = (current & 1u) == 0u ? 8u : 164u;
+    const uint16_t current_y = (uint16_t)(50u + (current / 2u) * 76u);
+    graphical_tile(previous, labels[previous], previous_x, previous_y, false);
+    graphical_tile(current, labels[current], current_x, current_y, true);
 }
 
 static void render_status(void) {
@@ -423,12 +435,15 @@ void picopen_gui_handle_key(uint8_t key) {
         return;
     }
     if (screen == GUI_HOME) {
+        const size_t previous = selection;
         if ((key == PICOPEN_KEY_LEFT) && ((selection & 1u) != 0u)) --selection;
         if ((key == PICOPEN_KEY_RIGHT) && ((selection & 1u) == 0u)) ++selection;
         if ((key == PICOPEN_KEY_UP) && (selection >= 2u)) selection -= 2u;
         if ((key == PICOPEN_KEY_DOWN) && (selection + 2u < GUI_HOME_ITEMS)) selection += 2u;
         if (key == PICOPEN_KEY_ENTER) { open_home_item(); return; }
-        render_home();
+        if (selection != previous) {
+            redraw_home_focus(previous, selection);
+        }
         return;
     }
     if (screen == GUI_FILES) {
