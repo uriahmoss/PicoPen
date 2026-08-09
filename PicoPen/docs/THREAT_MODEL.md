@@ -32,6 +32,41 @@
 - Apply regional frequency and power policy below the application layer.
 - Default newly detected attachments to unpowered or receive-only operation.
 - Never store secrets in plaintext audit records.
+- Deny sensitive operations when capability, scope, clock validity, audit
+  availability, or required physical confirmation cannot be established.
+- Keep credentials and signing keys out of removable storage by default;
+  encrypt stored secrets with a device-bound design selected before the vault
+  is implemented.
+- Authenticate remote-control sessions, bind each request to an expiring
+  session and engagement profile, reject replays, and retain a local emergency
+  stop that remote software cannot override.
+- Verify signed application and update manifests before parsing optional
+  payloads or allocating attacker-controlled sizes.
+- Rate-limit authentication, network probing, radio transmission, attachment
+  enumeration, and malformed-input logging.
+- Scrub secret buffers and avoid exposing raw credentials, keys, or sensitive
+  captures through crash reports, serial logs, UI previews, or remote bridges.
+
+## Secure defaults
+
+- Radios, USB HID, GPIO outputs, target power, and attachment transmitters start
+  disabled.
+- SD volumes mount read-only until an explicit storage policy authorizes a
+  bounded write operation; executable content is never auto-run.
+- Network services do not listen by default. Wi-Fi association does not grant
+  scan, probe, capture, or remote-control authority.
+- Newly installed applications have no capabilities. Grants are explicit,
+  reviewable, revocable, and narrower than the engagement scope.
+- Expired or absent engagement profiles permit passive local inspection only.
+- Recovery mode exposes repair and status operations, not secrets or assessment
+  tools.
+
+## Security failure behavior
+
+Failure of scope validation, audit persistence, authentication, package
+verification, or a privileged service returns a bounded error and leaves the
+active mechanism disabled. Security failures must not fall back to an
+unrestricted developer path.
 
 ## Engagement scope
 

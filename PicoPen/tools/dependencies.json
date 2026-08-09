@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "name": "Raspberry Pi Pico SDK",
+      "status": "incorporated",
+      "source": "https://github.com/raspberrypi/pico-sdk.git",
+      "pin": "2.2.0",
+      "license": "BSD-3-Clause",
+      "purpose": "RP2350 platform and upstream SDK integrations"
+    },
+    {
+      "name": "FatFs",
+      "status": "approved",
+      "source": "http://elm-chan.org/fsw/ff/",
+      "pin": "R0.15",
+      "license": "FatFs",
+      "purpose": "Read-only removable FAT filesystem support"
+    },
+    {
+      "name": "littlefs",
+      "status": "approved",
+      "source": "https://github.com/littlefs-project/littlefs.git",
+      "pin": "pending",
+      "license": "BSD-3-Clause",
+      "purpose": "Internal settings and audit journal"
+    },
+    {
+      "name": "LVGL",
+      "status": "approved",
+      "source": "https://github.com/lvgl/lvgl.git",
+      "pin": "pending",
+      "license": "MIT",
+      "purpose": "Graphical interface toolkit"
+    }
+  ]
+}

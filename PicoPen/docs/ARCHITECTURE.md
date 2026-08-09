@@ -39,6 +39,25 @@ system services         hardware services
 
 ## Core boundaries
 
+### Security invariants
+
+- The bootloader validates every executable image before transfer; removable
+  storage is never an implicit boot or trust source.
+- Applications receive no ambient hardware, network, filesystem, secret, or
+  remote-control authority. Every privileged operation crosses a PicoPen-owned
+  capability-checked service boundary.
+- Passive observation and active transmission are separate capabilities.
+  Active radio, USB HID, target power, GPIO drive, emulation, and automation
+  additionally require current engagement scope and local confirmation.
+- Imported libraries are mechanisms, not policy authorities. They cannot grant
+  capabilities, interpret engagement scope, access secrets directly, or bypass
+  the audit service.
+- Untrusted parsers run with fixed input limits, deadlines, explicit ownership,
+  and no direct transmitter access. A parser failure must fail closed without
+  disabling recovery or audit controls.
+- Developer mode is visibly marked, never silently enabled, and cannot be used
+  to represent production policy enforcement.
+
 ### Bootloader
 
 The bootloader owns image selection, validation, update finalization, rollback,
@@ -64,6 +83,26 @@ engagement scope, secrets, and audit records.
 
 Applications request named capabilities. Sensitive operations require both an
 application grant and a current engagement policy that permits the operation.
+
+## Trusted computing base
+
+The minimal trusted computing base consists of the RP2350 ROM, PicoPen stage-1,
+the kernel, capability and scope enforcement, secrets handling, audit service,
+and the narrow hardware-service entry points. GUI toolkits, filesystems,
+protocol decoders, network clients, and application runtimes remain outside the
+policy core even when they execute in the same address space during early
+releases. Their requests are validated again at the service boundary.
+
+RP2350 privilege separation and TrustZone remain planned hardening layers. The
+capability model must not depend on those layers to fail closed.
+
+## Dependency strategy
+
+PicoPen uses pinned permissively licensed components to accelerate standard
+mechanisms while retaining PicoPen-owned policy and interfaces. GPL or
+unclearly licensed firmware may be used as behavioral reference material but
+is not copied into PicoPen. See [DEPENDENCY_POLICY.md](DEPENDENCY_POLICY.md) and
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Initial execution model
 

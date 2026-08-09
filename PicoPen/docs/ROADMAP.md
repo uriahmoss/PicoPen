@@ -156,10 +156,30 @@ power interruptions without corrupting its boot metadata.
 
 ## Milestone 3: kernel and services
 
+- [x] **Slice 3A:** Establish the dependency and secure-service baseline
+  - [x] Accept a permissive-license-only dependency policy
+  - [x] Keep the PicoPen lightweight kernel and PicoPen-owned policy boundaries
+  - [x] Define deny-by-default capabilities and secure failure behavior
+  - [x] Add automated dependency provenance and license checks
+- [ ] **Slice 3B:** Integrate pinned FatFs R0.15 in read-only mode
+  - Compile out create, write, delete, rename, format, and free-space mutation
+  - Route block reads through the bounded PicoPen SD service
+  - Treat names, directory entries, partition data, and file contents as
+    untrusted and enforce path, depth, size, and iteration limits
+  - List a physical card's root directory without auto-running content
+- [ ] **Slice 3C:** Add the versioned storage service
+  - Separate removable read access, evidence export, and privileged mutation
+  - Require explicit capability and local policy for every SD write
+  - Add safe-removal, media-change, timeout, and corruption reporting
+- [ ] **Slice 3D:** Add pinned littlefs for internal settings and audit journals
+  - Keep secrets in a separately designed encrypted vault
+  - Test interrupted updates and full-media behavior
 - [ ] Work queues, timers, IPC, and capability checks
 - [ ] Device manager and attachment descriptors
 - [ ] Filesystem, settings, audit, and engagement-scope services
 - [ ] Crash reporting and recovery UI
+- [ ] Integrate pinned LVGL behind the PicoPen compositor and input services
+- [ ] Use Pico SDK-pinned TinyUSB and networking stacks behind capability checks
 
 ## Milestone 4: safe hardware workbench
 
