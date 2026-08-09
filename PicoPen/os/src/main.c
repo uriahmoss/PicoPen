@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "hardware/regs/resets.h"
 #include "hardware/resets.h"
@@ -119,6 +120,7 @@ int main(void) {
     picopen_audit_init();
     picopen_skin_init();
     picopen_workbench_init();
+    picopen_engagement_session_init();
 
     printf("\r\nPicoPen minimal OS\r\n");
     printf("version: %s\r\n", PICOPEN_VERSION);
@@ -282,7 +284,7 @@ int main(void) {
         PICOPEN_DEVICE_DISABLED_POLICY, true);
 
     picopen_engagement_t engagement;
-    picopen_engagement_init(&engagement);
+    picopen_engagement_session_snapshot(&engagement);
     picopen_security_context_t shell_security = picopen_security_default();
     shell_security.grants =
         (UINT64_C(1) << PICOPEN_CAP_STORAGE_READ) |
@@ -351,6 +353,22 @@ int main(void) {
             printf("key: 0x%02x state=%u\r\n", event.key, event.state);
         }
         const uint64_t now_ms = time_us_64() / 1000u;
+        const bool scope_expired = picopen_engagement_session_poll(now_ms);
+        picopen_engagement_t current_engagement;
+        picopen_engagement_session_snapshot(&current_engagement);
+        if ((current_engagement.active != shell_state.engagement.active) ||
+            (current_engagement.expires_ms != shell_state.engagement.expires_ms) ||
+            (strcmp(current_engagement.reference,
+                    shell_state.engagement.reference) != 0)) {
+            shell_state.engagement = current_engagement;
+            shell_state.security.engagement_active =
+                picopen_engagement_is_active(&current_engagement, now_ms);
+            picopen_shell_update_state(&shell_state);
+            picopen_gui_update_state(&shell_state);
+        }
+        if (scope_expired) {
+            picopen_audit_record("scope.expired", true);
+        }
         if (picopen_workbench_poll(now_ms)) {
             picopen_workbench_snapshot_t snapshot;
             picopen_workbench_snapshot(&snapshot);

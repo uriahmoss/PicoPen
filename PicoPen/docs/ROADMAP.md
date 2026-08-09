@@ -29,7 +29,11 @@ review gates and are never implied by acceleration.
   - Independent trusted built-in renderers plus data-only imported skins, with
     preview, accessibility checks, and safe fallback
 - [ ] **Bundle B: passive security workbench**
-  - Engagement-scope editor and persistent scope/security indicators
+  - [x] Add a locally confirmed, bounded, session-only engagement-scope editor
+    with reference validation, expiry, explicit deactivation, lifecycle audit,
+    and scope indicators across Home and application headers
+  - [ ] Persist reviewed engagement profiles only after the littlefs settings
+    layout and power-loss behavior are approved
   - [x] Add a no-I/O configuration and policy inventory for GPIO, ADC, I2C,
     SPI, UART, and attachments; live electrical observation remains deferred
     until the expansion-pin contract is verified
@@ -262,7 +266,9 @@ power interruptions without corrupting its boot metadata.
 - [ ] Filesystem, settings, audit, and engagement-scope services
   - [x] Add bounded root-only removable-file reads behind `storage.read`
   - [x] Add an inactive-by-default, reference-and-expiry engagement state
-  - [ ] Add reviewed state-transition and persistence interfaces
+  - [x] Add bounded activation, explicit deactivation, and expiry transitions
+    requiring local UI action
+  - [ ] Add reviewed persistence interfaces
 - [ ] Crash reporting and recovery UI
 - [ ] Structured audit service
   - [x] Add a bounded monotonic in-memory audit ring with no secret payloads

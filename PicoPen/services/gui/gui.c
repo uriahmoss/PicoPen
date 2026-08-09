@@ -19,6 +19,7 @@
 #define GUI_SCREEN_SIZE 1024u
 #define GUI_HOME_ITEMS 6u
 #define GUI_SYSTEM_ITEMS 6u
+#define GUI_SECURITY_ITEMS 3u
 
 #define GUI_COLOR_BACKGROUND UINT32_C(0x080020)
 #define GUI_COLOR_PANEL      UINT32_C(0x101040)
@@ -56,6 +57,9 @@ static size_t home_selection;
 static size_t system_selection;
 static picopen_storage_listing_t file_listing;
 static char file_path[PICOPEN_STORAGE_PATH_SIZE];
+static char engagement_reference[PICOPEN_ENGAGEMENT_REFERENCE_SIZE];
+static size_t engagement_reference_length;
+static size_t engagement_duration_index;
 static char canvas[GUI_SCREEN_SIZE];
 static char canvas_title[20];
 static size_t canvas_length;
@@ -88,7 +92,9 @@ static void begin(const char *title) {
     canvas_length = 0u;
     canvas[0] = '\0';
     snprintf(canvas_title, sizeof(canvas_title), "%s", title);
-    append("PICOPEN %-12s SD:RO SCOPE:OFF\n", title);
+    append("PICOPEN %-12s SD:RO SCOPE:%s\n", title,
+           picopen_engagement_session_active(time_us_64() / 1000u)
+               ? "ON" : "OFF");
     append("========================================\n");
 }
 
@@ -315,11 +321,25 @@ static void render_home(void) {
     };
     if (picopen_skin_current_id() == PICOPEN_SKIN_CRAYON) {
         picopen_crayon_renderer_home(labels, GUI_HOME_ITEMS, selection);
+        const bool active = picopen_engagement_session_active(
+            time_us_64() / 1000u);
+        picopen_display_fill_rect(240u, 4u, 76u, 14u,
+                                  active ? 0x145A32u : 0x501020u);
+        picopen_terminal_draw_text_at(246u, 7u,
+            active ? "SCOPE ON" : "SCOPE OFF", 1u, 0xFFFFFFu,
+            active ? 0x145A32u : 0x501020u);
         rendered_page_valid = false;
         return;
     }
     if (picopen_skin_current_id() == PICOPEN_SKIN_SYNTHWAVE) {
         picopen_synthwave_renderer_home(labels, GUI_HOME_ITEMS, selection);
+        const bool active = picopen_engagement_session_active(
+            time_us_64() / 1000u);
+        picopen_display_fill_rect(240u, 4u, 76u, 14u,
+                                  active ? 0x145A32u : 0x501020u);
+        picopen_terminal_draw_text_at(246u, 7u,
+            active ? "SCOPE ON" : "SCOPE OFF", 1u, 0xFFFFFFu,
+            active ? 0x145A32u : 0x501020u);
         rendered_page_valid = false;
         return;
     }
@@ -344,7 +364,10 @@ static void render_home(void) {
     picopen_display_fill_rect(0u, 43u, 320u, 1u, skin->accents[3]);
     draw_skin_text(8u, 10u, "PICOPEN", 2u, skin->text, skin->header);
     draw_skin_text(176u, 8u, "SD RO", 1u, skin->accents[5], skin->header);
-    draw_skin_text(216u, 8u, "SCOPE OFF", 1u, skin->accents[1], skin->header);
+    draw_skin_text(216u, 8u,
+                   picopen_engagement_session_active(time_us_64() / 1000u)
+                       ? "SCOPE ON" : "SCOPE OFF",
+                   1u, skin->accents[1], skin->header);
     draw_skin_text(216u, 23u, "LOCKED", 1u, skin->muted, skin->header);
     for (size_t index = 0u; index < GUI_HOME_ITEMS; ++index) {
         const uint16_t x = (index & 1u) == 0u ? 8u : 164u;
@@ -544,10 +567,26 @@ static void render_skins(void) {
 
 static void render_security(void) {
     begin("SECURITY");
-    append("\nSECURE DEFAULT       ACTIVE\nENGAGEMENT SCOPE     INACTIVE\n"
-           "SD ACCESS           READ-ONLY\nAUTO-RUN            DENIED\n"
-           "RADIO TRANSMIT      DENIED\nGPIO OUTPUT         DENIED\n"
-           "USB HID            DENIED\nREMOTE CONTROL      DENIED\n\nESC BACK\n");
+    picopen_engagement_t engagement;
+    picopen_engagement_session_snapshot(&engagement);
+    const uint64_t now_ms = time_us_64() / 1000u;
+    const bool active = picopen_engagement_is_active(&engagement, now_ms);
+    static const uint16_t durations_minutes[] = {15u, 60u, 240u};
+    append("SCOPE %s  SESSION ONLY\n\n", active ? "ACTIVE" : "INACTIVE");
+    append(selection == 0u ? "> REF %-20s\n" : "  REF %-20s\n",
+           engagement_reference_length == 0u ? "<TYPE REFERENCE>"
+                                             : engagement_reference);
+    append(selection == 1u ? "> DURATION %u MIN\n" : "  DURATION %u MIN\n",
+           durations_minutes[engagement_duration_index]);
+    append(selection == 2u ? "> %s\n" : "  %s\n",
+           active ? "END SCOPE" : "ACTIVATE SCOPE");
+    if (active) {
+        append("\nREF %s\nREMAINING %llu MIN\n", engagement.reference,
+               (engagement.expires_ms - now_ms + 59999u) / 60000u);
+    }
+    append("\nSCOPE DOES NOT GRANT CAPABILITIES\n"
+           "ACTIVE OUTPUTS REMAIN DENIED\n\n"
+           "UP/DOWN FIELD  LEFT/RIGHT TIME\nENTER SELECT  ESC BACK\n");
     present();
 }
 
@@ -689,8 +728,12 @@ void picopen_gui_update_state(const picopen_shell_state_t *state) {
     }
     if (screen == GUI_STATUS) {
         render_status();
+    } else if (screen == GUI_HOME) {
+        render_home();
     } else if (screen == GUI_DEVICES) {
         render_devices();
+    } else if (screen == GUI_SECURITY) {
+        render_security();
     } else if (screen == GUI_FILES) {
         if (selection >= file_listing.count) {
             selection = 0u;
@@ -823,6 +866,56 @@ void picopen_gui_handle_key(uint8_t key) {
         if ((key == PICOPEN_KEY_DOWN) && (selection + 1u < GUI_SYSTEM_ITEMS)) ++selection;
         if (key == PICOPEN_KEY_ENTER) { open_system_item(); return; }
         render_system();
+        return;
+    }
+    if (screen == GUI_SECURITY) {
+        static const uint64_t durations_ms[] = {
+            UINT64_C(900000), UINT64_C(3600000), UINT64_C(14400000),
+        };
+        if ((key == PICOPEN_KEY_UP) && (selection > 0u)) {
+            --selection;
+        } else if ((key == PICOPEN_KEY_DOWN) &&
+                   (selection + 1u < GUI_SECURITY_ITEMS)) {
+            ++selection;
+        } else if ((selection == 1u) && (key == PICOPEN_KEY_LEFT) &&
+                   (engagement_duration_index > 0u)) {
+            --engagement_duration_index;
+        } else if ((selection == 1u) && (key == PICOPEN_KEY_RIGHT) &&
+                   (engagement_duration_index + 1u <
+                    sizeof(durations_ms) / sizeof(durations_ms[0]))) {
+            ++engagement_duration_index;
+        } else if ((selection == 0u) &&
+                   ((key == 0x08u) || (key == 0x7Fu)) &&
+                   (engagement_reference_length > 0u)) {
+            engagement_reference[--engagement_reference_length] = '\0';
+        } else if ((selection == 0u) &&
+                   (engagement_reference_length + 1u <
+                    sizeof(engagement_reference)) &&
+                   (((key >= 'A') && (key <= 'Z')) ||
+                    ((key >= 'a') && (key <= 'z')) ||
+                    ((key >= '0') && (key <= '9')) ||
+                    (key == '-') || (key == '_') || (key == '.'))) {
+            engagement_reference[engagement_reference_length++] = (char)key;
+            engagement_reference[engagement_reference_length] = '\0';
+        } else if (key == PICOPEN_KEY_ENTER) {
+            if (selection < 2u) {
+                ++selection;
+            } else {
+                const uint64_t now_ms = time_us_64() / 1000u;
+                const bool active = picopen_engagement_session_active(now_ms);
+                const bool changed = active
+                    ? picopen_engagement_session_deactivate(true)
+                    : picopen_engagement_session_activate(
+                          engagement_reference, now_ms,
+                          durations_ms[engagement_duration_index], true);
+                picopen_audit_record(active ? "scope.end" : "scope.start",
+                                     changed);
+                picopen_engagement_session_snapshot(&gui_state.engagement);
+                gui_state.security.engagement_active =
+                    picopen_engagement_is_active(&gui_state.engagement, now_ms);
+            }
+        }
+        render_security();
         return;
     }
     if (screen == GUI_SKINS) {

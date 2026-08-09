@@ -80,6 +80,30 @@ class SecurityServiceBaselineTests(unittest.TestCase):
         self.assertIn("NO BUS TRAFFIC OR PIN CHANGES", gui)
         self.assertIn('picopen_audit_record("workbench.start"', gui)
 
+    def test_engagement_editor_is_bounded_local_and_does_not_grant_capabilities(self):
+        header = (ROOT / "services" / "policy" / "include" / "picopen" /
+                  "engagement.h").read_text(encoding="utf-8")
+        policy = (ROOT / "services" / "policy" / "engagement.c").read_text(
+            encoding="utf-8"
+        )
+        gui = (ROOT / "services" / "gui" / "gui.c").read_text(
+            encoding="utf-8"
+        )
+        main = (ROOT / "os" / "src" / "main.c").read_text(encoding="utf-8")
+        self.assertIn("PICOPEN_ENGAGEMENT_REFERENCE_SIZE 24u", header)
+        self.assertIn("PICOPEN_ENGAGEMENT_MAX_DURATION_MS", header)
+        self.assertIn("local_confirmation", policy)
+        self.assertIn("valid_reference", policy)
+        self.assertIn("SCOPE DOES NOT GRANT CAPABILITIES", gui)
+        self.assertIn("picopen_engagement_session_activate", gui)
+        self.assertIn('picopen_audit_record(active ? "scope.end"', gui)
+        self.assertIn("shell_state.security.engagement_active", main)
+        grants = re.search(r"shell_security\.grants\s*=\s*(?P<body>.*?);",
+                           main, re.DOTALL).group("body")
+        for forbidden in ("PICOPEN_CAP_GPIO_DRIVE", "PICOPEN_CAP_RADIO_TRANSMIT",
+                          "PICOPEN_CAP_TARGET_POWER", "PICOPEN_CAP_REMOTE_CONTROL"):
+            self.assertNotIn(forbidden, grants)
+
     def test_shutdown_requires_explicit_local_confirmation(self):
         capability = (ROOT / "kernel" / "capability.c").read_text(
             encoding="utf-8"
