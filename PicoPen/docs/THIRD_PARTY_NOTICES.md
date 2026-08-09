@@ -23,6 +23,17 @@ listed separately and is not a PicoPen dependency.
 - PicoPen configuration: writes, mkfs, chmod, labels, expansion, exFAT, long
   filenames, and dynamic LFN allocation disabled
 
+### Kalam
+
+- Source: Google Fonts repository, commit
+  `2d85e20401920891efb7cd6272d6339685df2820`
+- License: SIL Open Font License 1.1; retained at
+  `third_party/fonts/kalam/OFL.txt`
+- Purpose: offline source for the packed handwritten glyphs used by the
+  built-in Crayon skin
+- The firmware build uses the checked-in generated bitmap header and does not
+  require a host font engine.
+
 ## Approved for future integration
 
 - littlefs: internal settings and audit journal; BSD 3-Clause

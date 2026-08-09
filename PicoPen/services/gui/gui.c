@@ -5,14 +5,17 @@
 #include <string.h>
 
 #include "picopen/audit.h"
+#include "picopen/crayon_renderer.h"
 #include "picopen/display.h"
 #include "picopen/keyboard.h"
+#include "picopen/skin.h"
 #include "picopen/storage.h"
+#include "picopen/synthwave_renderer.h"
 #include "picopen/terminal.h"
 
 #define GUI_SCREEN_SIZE 1024u
 #define GUI_HOME_ITEMS 6u
-#define GUI_SYSTEM_ITEMS 5u
+#define GUI_SYSTEM_ITEMS 6u
 
 #define GUI_COLOR_BACKGROUND UINT32_C(0x080020)
 #define GUI_COLOR_PANEL      UINT32_C(0x101040)
@@ -36,6 +39,7 @@ typedef enum gui_screen {
     GUI_SYSTEM,
     GUI_SECURITY,
     GUI_UPDATE,
+    GUI_SKINS,
     GUI_ABOUT,
     GUI_SHUTDOWN,
     GUI_SHUTDOWN_RESULT,
@@ -45,8 +49,18 @@ typedef enum gui_screen {
 static picopen_shell_state_t gui_state;
 static gui_screen_t screen;
 static size_t selection;
+static size_t home_selection;
+static size_t system_selection;
 static char canvas[GUI_SCREEN_SIZE];
+static char canvas_title[20];
 static size_t canvas_length;
+static char rendered_lines[20][41];
+static bool rendered_page_valid;
+static gui_screen_t rendered_page_screen;
+static picopen_skin_id_t rendered_page_skin;
+
+static void outline(uint16_t x, uint16_t y, uint16_t width, uint16_t height,
+                    uint16_t thickness, uint32_t color);
 
 static void append(const char *format, ...) {
     if (canvas_length >= sizeof(canvas) - 1u) {
@@ -68,14 +82,110 @@ static void append(const char *format, ...) {
 static void begin(const char *title) {
     canvas_length = 0u;
     canvas[0] = '\0';
+    snprintf(canvas_title, sizeof(canvas_title), "%s", title);
     append("PICOPEN %-12s SD:RO SCOPE:OFF\n", title);
     append("========================================\n");
 }
 
+static void draw_page_texture(const picopen_skin_t *skin, uint16_t y,
+                              uint16_t height) {
+    picopen_display_fill_rect(0u, y, 320u, height, skin->background);
+    const uint16_t end = (uint16_t)(y + height);
+    if (skin->style == PICOPEN_SKIN_STYLE_NEON) {
+        for (uint16_t line_y = 48u; line_y < 288u; line_y += 24u) {
+            if ((line_y >= y) && (line_y < end)) {
+                picopen_display_fill_rect(0u, line_y, 320u, 1u, 0x240046u);
+            }
+        }
+        for (uint16_t x = 0u; x < 320u; x += 40u) {
+            picopen_display_fill_rect(x, y, 1u, height, 0x180036u);
+        }
+    } else if (skin->style == PICOPEN_SKIN_STYLE_CRAYON) {
+        uint16_t line_y = (uint16_t)(y + ((13u - (y % 13u)) % 13u));
+        for (; line_y < end; line_y += 13u) {
+            for (uint16_t x = (uint16_t)(line_y % 9u); x < 320u; x += 17u) {
+                picopen_display_fill_rect(x, line_y, 1u, 1u, 0xD9C79Fu);
+            }
+        }
+    }
+}
+
+static void draw_page_line(const picopen_skin_t *skin, uint16_t row,
+                           const char *line) {
+    const size_t length = strlen(line);
+    const uint16_t y = (uint16_t)(row * 16u);
+    draw_page_texture(skin, y, 16u);
+    uint32_t background = skin->background;
+    if (row == 0u) {
+        picopen_display_fill_rect(0u, 0u, 320u, 16u, skin->header);
+        background = skin->header;
+    } else if ((length > 0u) && (line[0] == '>')) {
+        picopen_display_fill_rect(2u, y, 316u, 16u, skin->panel);
+        if (skin->textured_focus) {
+            for (uint16_t x = 4u; x < 316u; x += 7u) {
+                const uint16_t sy = (uint16_t)(y + 2u + ((x / 7u) % 9u));
+                picopen_display_fill_rect(x, sy, 9u, 2u, skin->focus);
+            }
+        }
+        outline(2u, y, 316u, 16u, 2u, skin->focus);
+        background = skin->panel;
+    } else if ((length >= 8u) && (line[0] == '=')) {
+        picopen_display_fill_rect(0u, (uint16_t)(y + 7u), 320u, 2u,
+                                  skin->accents[3]);
+        return;
+    }
+    const picopen_text_style_t text_style =
+        skin->style == PICOPEN_SKIN_STYLE_CRAYON ? PICOPEN_TEXT_CRAYON :
+        (skin->style == PICOPEN_SKIN_STYLE_NEON ? PICOPEN_TEXT_NEON
+                                                : PICOPEN_TEXT_PIXEL);
+    picopen_terminal_draw_styled_text_at(4u, (uint16_t)(y + 3u), line, 1u,
+        skin->text, skin->style == PICOPEN_SKIN_STYLE_CRAYON
+            ? skin->accents[row % 6u] : skin->accents[3],
+        background, text_style);
+}
+
 static void present(void) {
-    picopen_terminal_init();
-    picopen_terminal_write(canvas);
-    picopen_terminal_render();
+    const picopen_skin_t *const skin = picopen_skin_current();
+    char lines[20][41] = {{0}};
+    size_t offset = 0u;
+    for (uint16_t row = 0u; (row < 20u) && (canvas[offset] != '\0'); ++row) {
+        size_t length = 0u;
+        while ((canvas[offset] != '\0') && (canvas[offset] != '\n')) {
+            if (length < sizeof(lines[row]) - 1u) {
+                lines[row][length++] = canvas[offset];
+            }
+            ++offset;
+        }
+        if (canvas[offset] == '\n') {
+            ++offset;
+        }
+        lines[row][length] = '\0';
+    }
+    if (picopen_skin_current_id() == PICOPEN_SKIN_CRAYON) {
+        picopen_crayon_renderer_page((uint8_t)screen, canvas_title, lines);
+        rendered_page_valid = false;
+        return;
+    }
+    if (picopen_skin_current_id() == PICOPEN_SKIN_SYNTHWAVE) {
+        picopen_synthwave_renderer_page((uint8_t)screen, lines);
+        rendered_page_valid = false;
+        return;
+    }
+    const bool full_redraw = !rendered_page_valid ||
+        (rendered_page_screen != screen) ||
+        (rendered_page_skin != picopen_skin_current_id());
+    if (full_redraw) {
+        draw_page_texture(skin, 0u, 320u);
+    }
+    for (uint16_t row = 0u; row < 20u; ++row) {
+        if (full_redraw || (strcmp(lines[row], rendered_lines[row]) != 0)) {
+            draw_page_line(skin, row, lines[row]);
+            strcpy(rendered_lines[row], lines[row]);
+        }
+    }
+    rendered_page_valid = true;
+    rendered_page_screen = screen;
+    rendered_page_skin = picopen_skin_current_id();
 }
 
 static void item(const char *label, size_t index) {
@@ -90,6 +200,18 @@ static void outline(uint16_t x, uint16_t y, uint16_t width, uint16_t height,
     picopen_display_fill_rect(x, y, thickness, height, color);
     picopen_display_fill_rect((uint16_t)(x + width - thickness), y, thickness,
                               height, color);
+}
+
+static void draw_skin_text(uint16_t x, uint16_t y, const char *text,
+                           uint8_t scale, uint32_t foreground,
+                           uint32_t background) {
+    const picopen_skin_t *const skin = picopen_skin_current();
+    const picopen_text_style_t style =
+        skin->style == PICOPEN_SKIN_STYLE_CRAYON ? PICOPEN_TEXT_CRAYON :
+        (skin->style == PICOPEN_SKIN_STYLE_NEON ? PICOPEN_TEXT_NEON
+                                                : PICOPEN_TEXT_PIXEL);
+    picopen_terminal_draw_styled_text_at(x, y, text, scale, foreground,
+                                         skin->accents[3], background, style);
 }
 
 static void tile_icon(size_t index, uint16_t center_x, uint16_t y,
@@ -137,55 +259,112 @@ static void tile_icon(size_t index, uint16_t center_x, uint16_t y,
 
 static void graphical_tile(size_t index, const char *label, uint16_t x,
                            uint16_t y, bool focused) {
-    static const uint32_t accents[GUI_HOME_ITEMS] = {
-        GUI_COLOR_MAGENTA, GUI_COLOR_CYAN, GUI_COLOR_CYAN,
-        GUI_COLOR_VIOLET, GUI_COLOR_MAGENTA, GUI_COLOR_ORANGE,
-    };
-    const uint32_t accent = focused ? GUI_COLOR_FOCUS : accents[index];
-    picopen_display_fill_rect(x, y, 148u, 66u, GUI_COLOR_PANEL);
-    outline(x, y, 148u, 66u, focused ? 3u : 2u, accent);
-    tile_icon(index, (uint16_t)(x + 74u), (uint16_t)(y + 8u), accent);
+    const picopen_skin_t *const skin = picopen_skin_current();
+    const uint32_t accent = focused ? skin->focus : skin->accents[index];
+    picopen_display_fill_rect(x, y, 148u, 66u, skin->panel);
+    if (focused && skin->textured_focus) {
+        for (uint16_t stroke = 0u; stroke < 7u; ++stroke) {
+            for (uint16_t step = 0u; step < 17u; ++step) {
+                const uint16_t sx = (uint16_t)(x + 5u + step * 8u);
+                const uint16_t sy = (uint16_t)(y + 5u + stroke * 8u +
+                    ((step + stroke) % 4u));
+                picopen_display_fill_rect(sx, sy, 10u, 2u, skin->focus);
+            }
+        }
+    }
+    if (skin->style == PICOPEN_SKIN_STYLE_CRAYON) {
+        outline((uint16_t)(x + 1u), y, 146u, 66u, 2u, accent);
+        picopen_display_fill_rect((uint16_t)(x + 5u), (uint16_t)(y + 3u),
+                                  55u, 1u, skin->accents[index]);
+        picopen_display_fill_rect((uint16_t)(x + 78u),
+                                  (uint16_t)(y + 62u), 62u, 1u,
+                                  skin->accents[index]);
+    } else {
+        outline(x, y, 148u, 66u, focused ? 3u : 2u, accent);
+    }
+    if (skin->style == PICOPEN_SKIN_STYLE_NEON) {
+        outline((uint16_t)(x + 4u), (uint16_t)(y + 4u), 140u, 58u, 1u,
+                focused ? skin->accents[0] : 0x240046u);
+    }
+    const bool crayon = skin->style == PICOPEN_SKIN_STYLE_CRAYON;
+    tile_icon(index, (uint16_t)(x + (crayon ? 32u : 74u)),
+              (uint16_t)(y + (crayon ? 21u : 8u)),
+              crayon ? skin->accents[index] : accent);
     const size_t length = strlen(label);
-    const uint16_t text_width = (uint16_t)(length * 12u);
-    picopen_terminal_draw_text_at(
-        (uint16_t)(x + (148u - text_width) / 2u), (uint16_t)(y + 39u), label,
-        2u, accent, GUI_COLOR_PANEL);
+    const uint8_t text_scale = crayon ? 1u : 2u;
+    const uint16_t text_width = crayon ? (uint16_t)(length * 8u)
+                                       : (uint16_t)(length * 12u);
+    const uint16_t text_x = crayon
+        ? (uint16_t)(x + 61u + ((83u - text_width) / 2u))
+        : (uint16_t)(x + ((148u - text_width) / 2u));
+    const uint16_t text_y = crayon
+        ? (uint16_t)(y + 25u)
+        : (uint16_t)(y + 39u);
+    draw_skin_text(
+        text_x, text_y, label, text_scale, skin->text, skin->panel);
 }
 
 static void render_home(void) {
     static const char *const labels[GUI_HOME_ITEMS] = {
         "STATUS", "FILES", "DEVICES", "WORKBENCH", "AUDIT", "SYSTEM",
     };
-    picopen_display_fill_rect(0u, 0u, 320u, 320u, GUI_COLOR_BACKGROUND);
-    picopen_display_fill_rect(0u, 0u, 320u, 44u, GUI_COLOR_HEADER);
-    picopen_display_fill_rect(0u, 43u, 320u, 1u, GUI_COLOR_VIOLET);
-    picopen_terminal_draw_text_at(8u, 10u, "PICOPEN", 2u,
-                                  GUI_COLOR_MAGENTA, GUI_COLOR_HEADER);
-    picopen_terminal_draw_text_at(176u, 8u, "SD RO", 1u, GUI_COLOR_GOLD,
-                                  GUI_COLOR_HEADER);
-    picopen_terminal_draw_text_at(216u, 8u, "SCOPE OFF", 1u, GUI_COLOR_CYAN,
-                                  GUI_COLOR_HEADER);
-    picopen_terminal_draw_text_at(216u, 23u, "LOCKED", 1u, GUI_COLOR_MUTED,
-                                  GUI_COLOR_HEADER);
+    if (picopen_skin_current_id() == PICOPEN_SKIN_CRAYON) {
+        picopen_crayon_renderer_home(labels, GUI_HOME_ITEMS, selection);
+        rendered_page_valid = false;
+        return;
+    }
+    if (picopen_skin_current_id() == PICOPEN_SKIN_SYNTHWAVE) {
+        picopen_synthwave_renderer_home(labels, GUI_HOME_ITEMS, selection);
+        rendered_page_valid = false;
+        return;
+    }
+    const picopen_skin_t *const skin = picopen_skin_current();
+    rendered_page_valid = false;
+    picopen_display_fill_rect(0u, 0u, 320u, 320u, skin->background);
+    if (skin->style == PICOPEN_SKIN_STYLE_NEON) {
+        for (uint16_t y = 48u; y < 282u; y += 24u) {
+            picopen_display_fill_rect(0u, y, 320u, 1u, 0x240046u);
+        }
+        for (uint16_t x = 0u; x < 320u; x += 40u) {
+            picopen_display_fill_rect(x, 44u, 1u, 238u, 0x180036u);
+        }
+    } else if (skin->style == PICOPEN_SKIN_STYLE_CRAYON) {
+        for (uint16_t y = 3u; y < 282u; y += 13u) {
+            for (uint16_t x = (uint16_t)(y % 9u); x < 320u; x += 17u) {
+                picopen_display_fill_rect(x, y, 1u, 1u, 0xD9C79Fu);
+            }
+        }
+    }
+    picopen_display_fill_rect(0u, 0u, 320u, 44u, skin->header);
+    picopen_display_fill_rect(0u, 43u, 320u, 1u, skin->accents[3]);
+    draw_skin_text(8u, 10u, "PICOPEN", 2u, skin->text, skin->header);
+    draw_skin_text(176u, 8u, "SD RO", 1u, skin->accents[5], skin->header);
+    draw_skin_text(216u, 8u, "SCOPE OFF", 1u, skin->accents[1], skin->header);
+    draw_skin_text(216u, 23u, "LOCKED", 1u, skin->muted, skin->header);
     for (size_t index = 0u; index < GUI_HOME_ITEMS; ++index) {
         const uint16_t x = (index & 1u) == 0u ? 8u : 164u;
         const uint16_t y = (uint16_t)(50u + (index / 2u) * 76u);
         graphical_tile(index, labels[index], x, y, selection == index);
     }
-    picopen_display_fill_rect(0u, 282u, 320u, 38u, GUI_COLOR_HEADER);
-    picopen_display_fill_rect(0u, 282u, 320u, 1u, GUI_COLOR_VIOLET);
-    picopen_terminal_draw_text_at(10u, 294u, "ARROWS MOVE", 1u,
-                                  GUI_COLOR_MAGENTA, GUI_COLOR_HEADER);
-    picopen_terminal_draw_text_at(116u, 294u, "ENTER SELECT", 1u,
-                                  GUI_COLOR_CYAN, GUI_COLOR_HEADER);
-    picopen_terminal_draw_text_at(244u, 294u, "ESC BACK", 1u,
-                                  GUI_COLOR_VIOLET, GUI_COLOR_HEADER);
+    picopen_display_fill_rect(0u, 282u, 320u, 38u, skin->header);
+    picopen_display_fill_rect(0u, 282u, 320u, 1u, skin->accents[3]);
+    draw_skin_text(10u, 294u, "ARROWS MOVE", 1u, skin->text, skin->header);
+    draw_skin_text(116u, 294u, "ENTER SELECT", 1u, skin->text, skin->header);
+    draw_skin_text(244u, 294u, "ESC BACK", 1u, skin->text, skin->header);
 }
 
 static void redraw_home_focus(size_t previous, size_t current) {
     static const char *const labels[GUI_HOME_ITEMS] = {
         "STATUS", "FILES", "DEVICES", "WORKBENCH", "AUDIT", "SYSTEM",
     };
+    if (picopen_skin_current_id() == PICOPEN_SKIN_CRAYON) {
+        picopen_crayon_renderer_home_focus(labels, previous, current);
+        return;
+    }
+    if (picopen_skin_current_id() == PICOPEN_SKIN_SYNTHWAVE) {
+        picopen_synthwave_renderer_home_focus(labels, previous, current);
+        return;
+    }
     const uint16_t previous_x = (previous & 1u) == 0u ? 8u : 164u;
     const uint16_t previous_y = (uint16_t)(50u + (previous / 2u) * 76u);
     const uint16_t current_x = (current & 1u) == 0u ? 8u : 164u;
@@ -292,7 +471,7 @@ static void render_audit(void) {
 
 static void render_system(void) {
     static const char *const labels[GUI_SYSTEM_ITEMS] = {
-        "SECURITY", "WIFI UPDATE", "TERMINAL", "POWER", "ABOUT",
+        "SECURITY", "WIFI UPDATE", "SKINS", "TERMINAL", "POWER", "ABOUT",
     };
     begin("SYSTEM");
     append("\n");
@@ -300,6 +479,19 @@ static void render_system(void) {
         item(labels[index], index);
     }
     append("\nUP/DOWN  ENTER SELECT  ESC BACK\n");
+    present();
+}
+
+static void render_skins(void) {
+    begin("SKINS");
+    append("FACTORY DEFAULT: SYNTHWAVE\n\n");
+    for (size_t index = 0u; index < PICOPEN_SKIN_COUNT; ++index) {
+        const picopen_skin_t *const skin = picopen_skin_get((picopen_skin_id_t)index);
+        append(selection == index ? "> %-16s%s\n" : "  %-16s%s\n",
+               skin->name,
+               picopen_skin_current_id() == (picopen_skin_id_t)index ? " ACTIVE" : "");
+    }
+    append("\nENTER SET SESSION DEFAULT\nPERSISTENCE: NOT YET ENABLED\nESC BACK\n");
     present();
 }
 
@@ -359,6 +551,7 @@ static void render(void) {
         case GUI_SYSTEM: render_system(); break;
         case GUI_SECURITY: render_security(); break;
         case GUI_UPDATE: render_update(); break;
+        case GUI_SKINS: render_skins(); break;
         case GUI_ABOUT: render_about(); break;
         case GUI_SHUTDOWN: render_shutdown(); break;
         case GUI_SHUTDOWN_RESULT: break;
@@ -370,18 +563,22 @@ static void open_home_item(void) {
     static const gui_screen_t screens[GUI_HOME_ITEMS] = {
         GUI_STATUS, GUI_FILES, GUI_DEVICES, GUI_WORKBENCH, GUI_AUDIT, GUI_SYSTEM,
     };
+    home_selection = selection;
     screen = screens[selection];
-    selection = 0u;
+    selection = screen == GUI_SYSTEM ? system_selection : 0u;
     render();
 }
 
 static void open_system_item(void) {
     static const gui_screen_t screens[GUI_SYSTEM_ITEMS] = {
-        GUI_SECURITY, GUI_UPDATE, GUI_TERMINAL, GUI_SHUTDOWN, GUI_ABOUT,
+        GUI_SECURITY, GUI_UPDATE, GUI_SKINS, GUI_TERMINAL, GUI_SHUTDOWN,
+        GUI_ABOUT,
     };
+    system_selection = selection;
     screen = screens[selection];
-    selection = 0u;
+    selection = screen == GUI_SKINS ? (size_t)picopen_skin_current_id() : 0u;
     if (screen == GUI_TERMINAL) {
+        rendered_page_valid = false;
         picopen_terminal_init();
         picopen_terminal_write("PICOPEN ADVANCED TERMINAL\nESC RETURNS TO GUI\n\n> ");
         picopen_terminal_render();
@@ -396,7 +593,8 @@ static gui_screen_t parent_screen(gui_screen_t current) {
         return GUI_FILES;
     }
     if ((current == GUI_SECURITY) || (current == GUI_UPDATE) ||
-        (current == GUI_ABOUT) || (current == GUI_SHUTDOWN) ||
+        (current == GUI_SKINS) || (current == GUI_ABOUT) ||
+        (current == GUI_SHUTDOWN) ||
         (current == GUI_SHUTDOWN_RESULT)) {
         return GUI_SYSTEM;
     }
@@ -409,11 +607,14 @@ void picopen_gui_init(const picopen_shell_state_t *state) {
     }
     screen = GUI_HOME;
     selection = 0u;
+    home_selection = 0u;
+    system_selection = 0u;
     picopen_audit_record("gui.start", true);
     render();
 }
 
 void picopen_gui_show_boot_status(const char *stage, const char *status) {
+    rendered_page_valid = false;
     picopen_display_fill_rect(0u, 0u, 320u, 320u, GUI_COLOR_BACKGROUND);
     picopen_display_fill_rect(0u, 0u, 320u, 54u, GUI_COLOR_HEADER);
     picopen_terminal_draw_text_at(58u, 16u, "PICOPEN", 3u,
@@ -450,7 +651,7 @@ void picopen_gui_handle_key(uint8_t key) {
     if (screen == GUI_TERMINAL) {
         if (key == PICOPEN_KEY_ESCAPE) {
             screen = GUI_SYSTEM;
-            selection = 2u;
+            selection = system_selection;
             render();
         } else {
             picopen_shell_handle_key(key);
@@ -458,10 +659,15 @@ void picopen_gui_handle_key(uint8_t key) {
         return;
     }
     if (key == PICOPEN_KEY_ESCAPE) {
+        const gui_screen_t previous_screen = screen;
         screen = parent_screen(screen);
         if ((screen == GUI_FILES) && (selection >= gui_state.storage.count)) {
             selection = 0u;
-        } else if (screen != GUI_FILES) {
+        } else if (screen == GUI_HOME) {
+            selection = home_selection;
+        } else if (screen == GUI_SYSTEM) {
+            selection = system_selection;
+        } else if (previous_screen != GUI_FILE_VIEW) {
             selection = 0u;
         }
         render();
@@ -498,12 +704,28 @@ void picopen_gui_handle_key(uint8_t key) {
         render_system();
         return;
     }
+    if (screen == GUI_SKINS) {
+        if ((key == PICOPEN_KEY_UP) && (selection > 0u)) --selection;
+        if ((key == PICOPEN_KEY_DOWN) && (selection + 1u < PICOPEN_SKIN_COUNT)) ++selection;
+        if (key == PICOPEN_KEY_ENTER) {
+            (void)picopen_skin_select((picopen_skin_id_t)selection);
+            picopen_crayon_renderer_invalidate();
+            picopen_synthwave_renderer_invalidate();
+            picopen_audit_record("skin.select", true);
+            screen = GUI_HOME;
+            selection = home_selection;
+            render_home();
+            return;
+        }
+        render_skins();
+        return;
+    }
     if (screen == GUI_SHUTDOWN) {
         if ((key == PICOPEN_KEY_UP) || (key == PICOPEN_KEY_DOWN)) selection ^= 1u;
         if (key == PICOPEN_KEY_ENTER) {
             if (selection == 0u) {
                 screen = GUI_SYSTEM;
-                selection = 3u;
+                selection = system_selection;
                 render_system();
             } else {
                 const bool accepted = picopen_security_authorize(

@@ -85,6 +85,30 @@ the command shell remains an explicitly selected advanced application. A later
 compositor may improve visual fidelity without changing navigation or service
 authorization semantics.
 
+### Appearance renderer boundary
+
+The GUI state machine owns navigation, screen data, authorization results, and
+input handling. It does not define the geometry or visual components of a
+built-in skin. Each trusted built-in skin has an independent renderer module
+which owns its complete visual language, including:
+
+- screen and menu layout;
+- damage regions and repaint policy;
+- fonts and packed bitmap assets;
+- icon silhouettes and control shapes;
+- borders, shading, textures, colors, and focus treatment; and
+- the presentation of submenus, dialogs, status, and help affordances.
+
+Renderers consume bounded, non-owning view models from the GUI and cannot make
+navigation or policy decisions. Synthwave geometry is not a base layout that
+other renderers must inherit. A built-in renderer may share low-level bounded
+pixel and text primitives, but not widgets or layout rules unless both skins
+explicitly choose to use them.
+
+Imported skins remain a separate future feature. They are untrusted data and
+must use a versioned, bounded declarative format; they never supply executable
+renderer callbacks.
+
 ### Applications
 
 Applications request named capabilities. Sensitive operations require both an

@@ -1,3 +1,4 @@
+import hashlib
 import json
 import pathlib
 import unittest
@@ -7,7 +8,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "tools" / "dependencies.json"
 LOCK = ROOT / "tools" / "dependencies.lock"
 
-ALLOWED_LICENSES = {"BSD-3-Clause", "MIT", "FatFs"}
+ALLOWED_LICENSES = {"BSD-3-Clause", "MIT", "FatFs", "OFL-1.1"}
 ALLOWED_STATUS = {"incorporated", "approved"}
 
 
@@ -71,6 +72,22 @@ class DependencyManifestTests(unittest.TestCase):
         )
         self.assertIn(f"FATFS_SOURCE_REPOSITORY={fatfs['source']}", lock_text)
         self.assertIn(f"FATFS_SOURCE_COMMIT={fatfs['pin']}", lock_text)
+
+    def test_kalam_font_asset_matches_pinned_source(self):
+        font = next(
+            component for component in self.components
+            if component["name"] == "Kalam"
+        )
+        lock_text = LOCK.read_text(encoding="utf-8")
+        font_path = ROOT / "third_party" / "fonts" / "kalam" / "Kalam-Regular.ttf"
+        generated = (ROOT / "services" / "appearance" / "include" /
+                     "picopen" / "crayon_font.h").read_text(encoding="utf-8")
+        digest = hashlib.sha256(font_path.read_bytes()).hexdigest()
+        self.assertIn(f"KALAM_FONT_REPOSITORY={font['source']}", lock_text)
+        self.assertIn(f"KALAM_FONT_COMMIT={font['pin']}", lock_text)
+        self.assertIn(f"KALAM_FONT_SHA256={digest}", lock_text)
+        self.assertIn("PICOPEN_CRAYON_WIDTH 8u", generated)
+        self.assertIn("PICOPEN_CRAYON_HEIGHT 13u", generated)
 
 
 if __name__ == "__main__":

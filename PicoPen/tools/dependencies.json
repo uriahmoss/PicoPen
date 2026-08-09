@@ -18,6 +18,14 @@
       "purpose": "Read-only removable FAT filesystem support"
     },
     {
+      "name": "Kalam",
+      "status": "incorporated",
+      "source": "https://github.com/google/fonts.git",
+      "pin": "2d85e20401920891efb7cd6272d6339685df2820",
+      "license": "OFL-1.1",
+      "purpose": "Packed handwritten glyph source for the built-in Crayon skin"
+    },
+    {
       "name": "littlefs",
       "status": "approved",
       "source": "https://github.com/littlefs-project/littlefs.git",

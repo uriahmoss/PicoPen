@@ -18,6 +18,7 @@
 #include "picopen/display.h"
 #include "picopen/keyboard.h"
 #include "picopen/gui.h"
+#include "picopen/skin.h"
 #include "picopen/sd.h"
 #include "picopen/shell.h"
 #include "picopen/storage.h"
@@ -115,6 +116,7 @@ int main(void) {
     watchdog_hw->scratch[PICOPEN_BOOT_ATTEMPT_SCRATCH] = 0u;
     watchdog_disable();
     picopen_audit_init();
+    picopen_skin_init();
 
     printf("\r\nPicoPen minimal OS\r\n");
     printf("version: %s\r\n", PICOPEN_VERSION);

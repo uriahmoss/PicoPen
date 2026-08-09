@@ -1,0 +1,18 @@
+#ifndef PICOPEN_CRAYON_RENDERER_H
+#define PICOPEN_CRAYON_RENDERER_H
+
+#include <stddef.h>
+#include <stdint.h>
+
+#include "picopen/renderer_model.h"
+
+void picopen_crayon_renderer_invalidate(void);
+void picopen_crayon_renderer_home(const char *const labels[], size_t count,
+                                  size_t selected);
+void picopen_crayon_renderer_home_focus(const char *const labels[],
+                                        size_t previous, size_t selected);
+void picopen_crayon_renderer_page(
+    uint8_t screen_key, const char *title,
+    const char lines[PICOPEN_RENDER_PAGE_ROWS][PICOPEN_RENDER_LINE_SIZE]);
+
+#endif

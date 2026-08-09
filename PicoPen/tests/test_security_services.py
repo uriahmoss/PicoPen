@@ -94,6 +94,81 @@ class SecurityServiceBaselineTests(unittest.TestCase):
         self.assertIn("picopen_shell_update_state", main)
         self.assertIn("picopen_gui_update_state", main)
 
+    def test_skin_service_keeps_synthwave_as_factory_default(self):
+        skin = (ROOT / "services" / "appearance" / "skin.c").read_text(
+            encoding="utf-8"
+        )
+        gui = (ROOT / "services" / "gui" / "gui.c").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("current_skin = PICOPEN_SKIN_SYNTHWAVE", skin)
+        for name in ("SYNTHWAVE", "CRAYON", "HIGH CONTRAST", "MINIMAL DARK"):
+            self.assertIn(name, skin)
+        self.assertIn("textured_focus", gui)
+        self.assertIn("SESSION DEFAULT", gui)
+
+    def test_skin_schema_is_data_only(self):
+        header = (ROOT / "services" / "appearance" / "include" / "picopen" /
+                  "skin.h").read_text(encoding="utf-8")
+        self.assertNotIn("callback", header.lower())
+        self.assertNotIn("script", header.lower())
+        self.assertNotIn("void *", header)
+
+    def test_complex_skin_renderer_is_bounded(self):
+        terminal = (ROOT / "drivers" / "terminal" / "terminal.c").read_text(
+            encoding="utf-8"
+        )
+        gui = (ROOT / "services" / "gui" / "gui.c").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("PICOPEN_TEXT_CRAYON", terminal)
+        self.assertIn("PICOPEN_TEXT_NEON", terminal)
+        self.assertIn("scale > 4u", terminal)
+        self.assertIn("skin->textured_focus", gui)
+        self.assertIn("PICOPEN_SKIN_STYLE_NEON", gui)
+        self.assertIn("PICOPEN_SKIN_STYLE_CRAYON", gui)
+        self.assertIn("for (uint16_t row = 0u; (row < 20u)", gui)
+        self.assertIn("strcmp(lines[row], rendered_lines[row])", gui)
+        self.assertIn("draw_page_line", gui)
+        self.assertIn("crayon ? 32u : 74u", gui)
+
+    def test_synthwave_and_crayon_own_independent_renderers(self):
+        gui = (ROOT / "services" / "gui" / "gui.c").read_text(
+            encoding="utf-8"
+        )
+        crayon = (ROOT / "services" / "appearance" /
+                   "crayon_renderer.c").read_text(encoding="utf-8")
+        synthwave = (ROOT / "services" / "appearance" /
+                     "synthwave_renderer.c").read_text(encoding="utf-8")
+        self.assertIn("picopen_crayon_renderer_home", gui)
+        self.assertIn("picopen_synthwave_renderer_home", gui)
+        self.assertIn("crayon_screen_asset.h", crayon)
+        self.assertIn("picopen_display_blit_indexed8", crayon)
+        self.assertIn("draw_home_focus", crayon)
+        self.assertIn("picopen_crayon_focus_pixels", crayon)
+        self.assertIn("picopen_crayon_selected_pixels", crayon)
+        self.assertIn("draw_page_entry", crayon)
+        self.assertIn("draw_crayon_text_transparent", crayon)
+        self.assertNotIn("graphical_tile", crayon)
+        self.assertIn("grid", synthwave)
+        self.assertIn("tile", synthwave)
+        self.assertNotIn("my security sketchbook", synthwave)
+
+    def test_bitmap_compositor_is_bounded(self):
+        header = (ROOT / "drivers" / "display" / "include" / "picopen" /
+                  "display.h").read_text(encoding="utf-8")
+        display = (ROOT / "drivers" / "display" /
+                   "display.c").read_text(encoding="utf-8")
+        asset = (ROOT / "services" / "appearance" / "include" / "picopen" /
+                 "crayon_screen_asset.h").read_text(encoding="utf-8")
+        self.assertIn("picopen_display_blit_indexed8", header)
+        self.assertIn("picopen_display_blit_indexed8_keyed", header)
+        self.assertIn("palette_size > 256u", display)
+        self.assertIn("stride < width", display)
+        self.assertIn("PICOPEN_CRAYON_SCREEN_WIDTH 320u", asset)
+        self.assertIn("PICOPEN_CRAYON_SCREEN_HEIGHT 320u", asset)
+        self.assertIn("PICOPEN_CRAYON_SCREEN_COLORS 64u", asset)
+
 
 if __name__ == "__main__":
     unittest.main()

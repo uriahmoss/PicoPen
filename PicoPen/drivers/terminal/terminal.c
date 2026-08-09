@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "picopen/display.h"
+#include "picopen/crayon_font.h"
 
 #define TERMINAL_COLUMNS 40u
 #define TERMINAL_ROWS    20u
@@ -268,6 +269,134 @@ void picopen_terminal_draw_text_at(uint16_t x, uint16_t y, const char *text,
                 picopen_display_fill_rect(
                     (uint16_t)(x + column * scale),
                     (uint16_t)(y + row * scale), scale, scale, foreground);
+            }
+        }
+        x = (uint16_t)(x + cell_width);
+    }
+}
+
+static void draw_crayon_text(uint16_t x, uint16_t y, const char *text,
+                             uint8_t scale, uint32_t foreground,
+                             uint32_t secondary, uint32_t background,
+                             bool clear_background) {
+    for (size_t character_index = 0u; *text != '\0'; ++text, ++character_index) {
+        char character = *text;
+        if ((character >= 'a') && (character <= 'z')) {
+            character = (char)(character - ('a' - 'A'));
+        }
+        const uint16_t cell_width = (uint16_t)(PICOPEN_CRAYON_WIDTH * scale);
+        const uint16_t cell_height = (uint16_t)(PICOPEN_CRAYON_HEIGHT * scale);
+        if (((uint32_t)x + cell_width > 320u) ||
+            ((uint32_t)y + cell_height > 320u)) {
+            return;
+        }
+        if ((character < (char)PICOPEN_CRAYON_FIRST) ||
+            (character > (char)PICOPEN_CRAYON_LAST)) {
+            character = '?';
+        }
+        if (clear_background) {
+            picopen_display_fill_rect(x, y, cell_width, cell_height,
+                                      background);
+        }
+        const uint16_t *const rows =
+            picopen_crayon_glyphs[(unsigned int)character -
+                                   PICOPEN_CRAYON_FIRST];
+        for (uint16_t row = 0u; row < PICOPEN_CRAYON_HEIGHT; ++row) {
+            uint16_t column = 0u;
+            while (column < PICOPEN_CRAYON_WIDTH) {
+                const uint16_t mask = (uint16_t)(UINT16_C(1) <<
+                    (PICOPEN_CRAYON_WIDTH - 1u - column));
+                if ((rows[row] & mask) == 0u) {
+                    ++column;
+                    continue;
+                }
+                const uint16_t start = column;
+                while ((column < PICOPEN_CRAYON_WIDTH) &&
+                       ((rows[row] & (UINT16_C(1) <<
+                        (PICOPEN_CRAYON_WIDTH - 1u - column))) != 0u)) {
+                    ++column;
+                }
+                picopen_display_fill_rect((uint16_t)(x + start * scale),
+                    (uint16_t)(y + row * scale),
+                    (uint16_t)((column - start) * scale), scale, foreground);
+                if (((row + character_index) % 5u) == 0u) {
+                    picopen_display_fill_rect((uint16_t)(x + start * scale),
+                        (uint16_t)(y + row * scale), scale, scale, secondary);
+                }
+            }
+        }
+        x = (uint16_t)(x + cell_width);
+    }
+}
+
+void picopen_terminal_draw_crayon_text_transparent_at(
+    uint16_t x, uint16_t y, const char *text, uint8_t scale,
+    uint32_t foreground, uint32_t secondary) {
+    if ((text == NULL) || (scale == 0u) || (scale > 4u)) {
+        return;
+    }
+    draw_crayon_text(x, y, text, scale, foreground, secondary, 0u, false);
+}
+
+void picopen_terminal_draw_styled_text_at(
+    uint16_t x, uint16_t y, const char *text, uint8_t scale,
+    uint32_t foreground, uint32_t secondary, uint32_t background,
+    picopen_text_style_t style) {
+    if ((text == NULL) || (scale == 0u) || (scale > 4u)) {
+        return;
+    }
+    if (style == PICOPEN_TEXT_CRAYON) {
+        draw_crayon_text(x, y, text, scale, foreground, secondary, background,
+                          true);
+        return;
+    }
+    const uint16_t cell_width = (uint16_t)(GLYPH_WIDTH + 1u) * scale;
+    const uint16_t cell_height = GLYPH_HEIGHT * scale;
+    size_t character_index = 0u;
+    for (; *text != '\0'; ++text, ++character_index) {
+        if (((uint32_t)x + cell_width > TERMINAL_COLUMNS * CELL_WIDTH) ||
+            ((uint32_t)y + cell_height > TERMINAL_ROWS * CELL_HEIGHT)) {
+            return;
+        }
+        picopen_display_fill_rect(x, y, cell_width, cell_height, background);
+        const uint8_t *const glyph = glyph_for(*text);
+        if (style == PICOPEN_TEXT_NEON) {
+            for (uint16_t row = 0u; row < GLYPH_HEIGHT; ++row) {
+                for (uint16_t column = 0u; column < GLYPH_WIDTH; ++column) {
+                    if ((glyph[row] & (UINT8_C(1) <<
+                         (GLYPH_WIDTH - 1u - column))) != 0u) {
+                        picopen_display_fill_rect(
+                            (uint16_t)(x + column * scale),
+                            (uint16_t)(y + row * scale),
+                            (uint16_t)(scale + 1u), (uint16_t)(scale + 1u),
+                            secondary);
+                    }
+                }
+            }
+        }
+        for (uint16_t row = 0u; row < GLYPH_HEIGHT; ++row) {
+            for (uint16_t column = 0u; column < GLYPH_WIDTH; ++column) {
+                if ((glyph[row] & (UINT8_C(1) <<
+                     (GLYPH_WIDTH - 1u - column))) == 0u) {
+                    continue;
+                }
+                uint16_t px = (uint16_t)(x + column * scale);
+                uint16_t py = (uint16_t)(y + row * scale);
+                uint16_t width = scale;
+                uint16_t height = scale;
+                if (style == PICOPEN_TEXT_CRAYON) {
+                    const uint16_t variation = (uint16_t)(character_index +
+                        row * 3u + column * 5u);
+                    px = (uint16_t)(px + (variation & 1u));
+                    if ((scale > 1u) && ((variation % 5u) == 0u)) {
+                        width = (uint16_t)(scale - 1u);
+                    }
+                }
+                picopen_display_fill_rect(px, py, width, height, foreground);
+                if ((style == PICOPEN_TEXT_CRAYON) && (scale > 1u) &&
+                    (((row + column + character_index) % 4u) == 0u)) {
+                    picopen_display_fill_rect(px, py, 1u, 1u, secondary);
+                }
             }
         }
         x = (uint16_t)(x + cell_width);

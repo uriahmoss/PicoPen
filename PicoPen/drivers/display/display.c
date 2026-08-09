@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "hardware/gpio.h"
 #include "hardware/spi.h"
@@ -57,6 +58,19 @@ static void set_window(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1) {
     write_command(DISPLAY_COMMAND_WRITE, NULL, 0u);
 }
 
+static void write_rgb_stream(const uint8_t *pixels, size_t length) {
+    gpio_put(PICOPEN_DISPLAY_DC_PIN, true);
+    gpio_put(PICOPEN_DISPLAY_CS_PIN, false);
+    spi_write_blocking(display_spi, pixels, length);
+    gpio_put(PICOPEN_DISPLAY_CS_PIN, true);
+}
+
+static void encode_rgb666(uint32_t rgb, uint8_t encoded[3]) {
+    encoded[0] = (uint8_t)((rgb >> 16u) & 0xFCu);
+    encoded[1] = (uint8_t)((rgb >> 8u) & 0xFCu);
+    encoded[2] = (uint8_t)(rgb & 0xFCu);
+}
+
 void picopen_display_fill_rect(uint16_t x, uint16_t y, uint16_t width,
                                uint16_t height, uint32_t rgb) {
     if ((width == 0u) || (height == 0u) ||
@@ -81,6 +95,69 @@ void picopen_display_fill_rect(uint16_t x, uint16_t y, uint16_t width,
         remaining -= count;
     }
     gpio_put(PICOPEN_DISPLAY_CS_PIN, true);
+}
+
+void picopen_display_blit_indexed8(uint16_t x, uint16_t y, uint16_t width,
+                                   uint16_t height, const uint8_t *pixels,
+                                   size_t stride, const uint32_t *palette,
+                                   size_t palette_size) {
+    if ((pixels == NULL) || (palette == NULL) || (palette_size == 0u) ||
+        (palette_size > 256u) || (width == 0u) || (height == 0u) ||
+        (stride < width) || ((uint32_t)x + width > DISPLAY_WIDTH) ||
+        ((uint32_t)y + height > DISPLAY_HEIGHT)) {
+        return;
+    }
+    uint8_t encoded_palette[256u][3u];
+    for (size_t index = 0u; index < palette_size; ++index) {
+        encode_rgb666(palette[index], encoded_palette[index]);
+    }
+    uint8_t row[DISPLAY_WIDTH * 3u];
+    for (uint16_t py = 0u; py < height; ++py) {
+        const uint8_t *const source = &pixels[(size_t)py * stride];
+        for (uint16_t px = 0u; px < width; ++px) {
+            const uint8_t index = source[px];
+            const uint8_t safe_index = index < palette_size ? index : 0u;
+            memcpy(&row[(size_t)px * 3u], encoded_palette[safe_index], 3u);
+        }
+        set_window(x, (uint16_t)(y + py), (uint16_t)(x + width - 1u),
+                   (uint16_t)(y + py));
+        write_rgb_stream(row, (size_t)width * 3u);
+    }
+}
+
+void picopen_display_blit_indexed8_keyed(
+    uint16_t x, uint16_t y, uint16_t width, uint16_t height,
+    const uint8_t *pixels, size_t stride, const uint32_t *palette,
+    size_t palette_size, uint8_t transparent_index) {
+    if ((pixels == NULL) || (palette == NULL) || (palette_size == 0u) ||
+        (palette_size > 256u) || (width == 0u) || (height == 0u) ||
+        (stride < width) || ((uint32_t)x + width > DISPLAY_WIDTH) ||
+        ((uint32_t)y + height > DISPLAY_HEIGHT)) {
+        return;
+    }
+    for (uint16_t py = 0u; py < height; ++py) {
+        const uint8_t *const source = &pixels[(size_t)py * stride];
+        uint16_t run_start = 0u;
+        while (run_start < width) {
+            while ((run_start < width) &&
+                   (source[run_start] == transparent_index)) {
+                ++run_start;
+            }
+            uint16_t run_end = run_start;
+            while ((run_end < width) &&
+                   (source[run_end] != transparent_index)) {
+                ++run_end;
+            }
+            if (run_end == run_start) {
+                continue;
+            }
+            picopen_display_blit_indexed8(
+                (uint16_t)(x + run_start), (uint16_t)(y + py),
+                (uint16_t)(run_end - run_start), 1u, &source[run_start],
+                stride, palette, palette_size);
+            run_start = run_end;
+        }
+    }
 }
 
 bool picopen_display_init(void) {

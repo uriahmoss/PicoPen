@@ -10,6 +10,9 @@ add_executable(picopen_os
     ../services/storage/storage.c
     ../services/shell/shell.c
     ../services/gui/gui.c
+    ../services/appearance/skin.c
+    ../services/appearance/crayon_renderer.c
+    ../services/appearance/synthwave_renderer.c
     ../services/audit/audit.c
     ../services/device/device.c
     ../services/policy/engagement.c
@@ -37,6 +40,7 @@ target_include_directories(picopen_os PRIVATE
     ${PROJECT_SOURCE_DIR}/services/storage/include
     ${PROJECT_SOURCE_DIR}/services/shell/include
     ${PROJECT_SOURCE_DIR}/services/gui/include
+    ${PROJECT_SOURCE_DIR}/services/appearance/include
     ${PROJECT_SOURCE_DIR}/services/audit/include
     ${PROJECT_SOURCE_DIR}/services/device/include
     ${PROJECT_SOURCE_DIR}/services/policy/include

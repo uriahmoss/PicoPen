@@ -26,7 +26,8 @@ review gates and are never implied by acceleration.
   - Partial graphical redraws and measured input latency
   - Synthwave System, Files, status, dialog, and recovery screens
   - Battery warnings, backlight control, and locally confirmed shutdown
-  - Data-only menu skins with preview, accessibility checks, and safe fallback
+  - Independent trusted built-in renderers plus data-only imported skins, with
+    preview, accessibility checks, and safe fallback
 - [ ] **Bundle B: passive security workbench**
   - Engagement-scope editor and persistent scope/security indicators
   - Receive-only GPIO, ADC, I2C, SPI, UART, and attachment inventory
@@ -282,11 +283,37 @@ power interruptions without corrupting its boot metadata.
   - Add idle timeout, backlight settings, battery warning, and power controls
   - Preserve Advanced Terminal as a policy-equivalent application
   - Add `System > Appearance > Skins`
-    - Define a versioned, fixed-size, data-only skin schema with no executable
+    - Define a versioned, fixed-size, data-only imported-skin schema with no executable
       code, scripts, arbitrary drawing commands, or direct hardware access
     - Centralize background, panel, focus, warning, success, muted, header,
       footer, border, spacing, and text-scale tokens
-    - Ship built-in Synthwave, High Contrast, and Minimal Dark skins
+    - [x] Ship built-in Synthwave, Crayon, High Contrast, and Minimal Dark skins
+      with Synthwave retained as the factory default
+    - [x] Add a data-only fixed-size color/style token service
+    - [x] Add session-default selection and Crayon textured focus rendering
+    - [x] Remember Home and System menu selection when navigating back
+    - [x] Add bounded crayon-wax and neon-glow glyph styles
+    - [x] Add paper grain, neon grid, layered borders, and scribble focus fills
+    - [ ] Replace the shared palette-and-flags renderer with independent trusted
+      renderer modules for every built-in skin
+      - [ ] Separate GUI navigation/view data from all pixel geometry
+      - [x] Give Synthwave an independent neon renderer
+      - [x] Give Crayon an independent bitmap renderer matching the approved mockup
+        - [x] Add bounded indexed-color and transparent-key display blits
+        - [x] Pack an authored 320x320 Crayon Home composition and bounded
+          selection damage regions into firmware
+        - [x] Replace procedural Home focus masks with six authored illustrated
+          selection-state crops
+        - [ ] Replace generic submenu line arrays with semantic screen models
+          and authored Crayon layouts for every submenu and dialog
+      - [ ] Give High Contrast an independent accessibility renderer
+      - [ ] Give Minimal Dark an independent compact renderer
+      - [ ] Route submenus, details, dialogs, icons, and damage tracking through
+        the selected renderer
+    - [x] Add cached row-diff rendering so submenu navigation updates two rows
+    - [x] Give Crayon its own side-icon layout and rough asymmetric borders
+    - [x] Render Crayon labels with a pinned OFL handwritten bitmap font and
+      repaint only changed menu rows during navigation
     - Preview without persistence and provide explicit Apply, Cancel, and
       Restore Default actions
     - Enforce minimum contrast, bounds, supported token values, and complete
