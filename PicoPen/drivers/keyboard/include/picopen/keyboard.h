@@ -16,6 +16,15 @@ typedef struct picopen_key_event {
     picopen_key_state_t state;
 } picopen_key_event_t;
 
+typedef enum picopen_navigation_key {
+    PICOPEN_KEY_ENTER = 0x0Au,
+    PICOPEN_KEY_ESCAPE = 0xB1u,
+    PICOPEN_KEY_LEFT = 0xB4u,
+    PICOPEN_KEY_UP = 0xB5u,
+    PICOPEN_KEY_DOWN = 0xB6u,
+    PICOPEN_KEY_RIGHT = 0xB7u,
+} picopen_navigation_key_t;
+
 typedef struct picopen_keyboard_info {
     uint32_t baud_hz;
     int write_result;
@@ -34,5 +43,6 @@ typedef struct picopen_battery_info {
 bool picopen_keyboard_init(picopen_keyboard_info_t *info);
 bool picopen_keyboard_poll(picopen_key_event_t *event);
 bool picopen_keyboard_read_battery(picopen_battery_info_t *battery);
+bool picopen_keyboard_request_shutdown(uint8_t delay_seconds);
 
 #endif

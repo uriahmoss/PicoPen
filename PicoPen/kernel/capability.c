@@ -16,7 +16,8 @@ static bool requires_local_confirmation(picopen_capability_t capability) {
            (capability == PICOPEN_CAP_GPIO_DRIVE) ||
            (capability == PICOPEN_CAP_USB_HID) ||
            (capability == PICOPEN_CAP_TARGET_POWER) ||
-           (capability == PICOPEN_CAP_REMOTE_CONTROL);
+           (capability == PICOPEN_CAP_REMOTE_CONTROL) ||
+           (capability == PICOPEN_CAP_SYSTEM_SHUTDOWN);
 }
 
 picopen_security_context_t picopen_security_default(void) {
@@ -47,6 +48,7 @@ const char *picopen_capability_name(picopen_capability_t capability) {
         "storage.read", "storage.write", "network.connect", "network.probe",
         "radio.receive", "radio.transmit", "gpio.read", "gpio.drive",
         "usb.hid", "target.power", "remote.control",
+        "system.shutdown",
     };
     if ((unsigned int)capability >= sizeof(names) / sizeof(names[0])) {
         return "unknown";

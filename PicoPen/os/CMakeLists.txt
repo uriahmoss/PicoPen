@@ -1,5 +1,6 @@
 add_executable(picopen_os
     ../kernel/capability.c
+    ../kernel/ipc.c
     ../kernel/work_queue.c
     ../drivers/display/display.c
     ../drivers/keyboard/keyboard.c
@@ -8,7 +9,10 @@ add_executable(picopen_os
     ../services/storage/fatfs_diskio.c
     ../services/storage/storage.c
     ../services/shell/shell.c
+    ../services/gui/gui.c
     ../services/audit/audit.c
+    ../services/device/device.c
+    ../services/policy/engagement.c
     ../third_party/fatfs/ff.c
     src/main.c
 )
@@ -32,7 +36,10 @@ target_include_directories(picopen_os PRIVATE
     ${PROJECT_SOURCE_DIR}/drivers/terminal/include
     ${PROJECT_SOURCE_DIR}/services/storage/include
     ${PROJECT_SOURCE_DIR}/services/shell/include
+    ${PROJECT_SOURCE_DIR}/services/gui/include
     ${PROJECT_SOURCE_DIR}/services/audit/include
+    ${PROJECT_SOURCE_DIR}/services/device/include
+    ${PROJECT_SOURCE_DIR}/services/policy/include
     ${PROJECT_SOURCE_DIR}/third_party/fatfs
 )
 target_compile_definitions(picopen_os PRIVATE

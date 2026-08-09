@@ -6,6 +6,8 @@
 
 #include "picopen/keyboard.h"
 #include "picopen/capability.h"
+#include "picopen/device.h"
+#include "picopen/engagement.h"
 #include "picopen/sd.h"
 #include "picopen/storage.h"
 
@@ -17,6 +19,9 @@ typedef struct picopen_shell_state {
     picopen_sd_info_t sd;
     picopen_storage_listing_t storage;
     picopen_security_context_t security;
+    picopen_device_manager_t devices;
+    picopen_engagement_t engagement;
+    bool ipc_ready;
 } picopen_shell_state_t;
 
 void picopen_shell_init(const picopen_shell_state_t *state);

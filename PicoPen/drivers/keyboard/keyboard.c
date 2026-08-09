@@ -13,6 +13,10 @@
 #define KEYBOARD_REGISTER_VERSION 0x01u
 #define KEYBOARD_REGISTER_FIFO    0x09u
 #define KEYBOARD_REGISTER_BATTERY 0x0Bu
+#define KEYBOARD_REGISTER_POWER_OFF 0x0Eu
+#define KEYBOARD_WRITE_MASK       0x80u
+#define KEYBOARD_MIN_SHUTDOWN_DELAY 6u
+#define KEYBOARD_MAX_SHUTDOWN_DELAY 30u
 #define KEYBOARD_BATTERY_CHARGING 0x80u
 #define KEYBOARD_BATTERY_PERCENT  0x7Fu
 #define I2C_SCAN_FIRST_ADDRESS     0x08u
@@ -57,6 +61,23 @@ static bool read_register(uint8_t address, uint8_t response[2]) {
         initialization_info->response[1] = response[1];
     }
     return read_result == 2;
+}
+
+static bool write_register(uint8_t address, uint8_t value,
+                           uint8_t response[2]) {
+    const uint8_t message[2] = {
+        (uint8_t)(address | KEYBOARD_WRITE_MASK), value,
+    };
+    const int write_result = i2c_write_timeout_us(
+        keyboard_i2c, PICOPEN_KEYBOARD_ADDRESS, message, sizeof(message), false,
+        KEYBOARD_TIMEOUT_US);
+    if (write_result != (int)sizeof(message)) {
+        return false;
+    }
+    sleep_ms(KEYBOARD_RESPONSE_MS);
+    return i2c_read_timeout_us(keyboard_i2c, PICOPEN_KEYBOARD_ADDRESS,
+                               response, 2u, false,
+                               KEYBOARD_TIMEOUT_US) == 2;
 }
 
 bool picopen_keyboard_init(picopen_keyboard_info_t *info) {
@@ -127,4 +148,15 @@ bool picopen_keyboard_read_battery(picopen_battery_info_t *battery) {
     battery->charging =
         (response[1] & KEYBOARD_BATTERY_CHARGING) != 0u;
     return true;
+}
+
+bool picopen_keyboard_request_shutdown(uint8_t delay_seconds) {
+    if (!initialized || (delay_seconds < KEYBOARD_MIN_SHUTDOWN_DELAY) ||
+        (delay_seconds > KEYBOARD_MAX_SHUTDOWN_DELAY)) {
+        return false;
+    }
+    uint8_t response[2] = {0u, 0u};
+    return write_register(KEYBOARD_REGISTER_POWER_OFF, delay_seconds,
+                          response) &&
+           (response[0] == KEYBOARD_REGISTER_POWER_OFF);
 }

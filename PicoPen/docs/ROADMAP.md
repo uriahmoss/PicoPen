@@ -152,7 +152,10 @@ identity, while invalid images enter a recoverable state.
   - [x] Read and display bounded battery percentage and charging state
     - Hardware evidence: the accelerated baseline booted with the keyboard,
       storage, battery diagnostic, and interactive terminal functioning.
-  - [ ] Add a locally confirmed controlled-shutdown path
+  - [x] Add a locally confirmed controlled-shutdown path
+    - The keyboard-controller request requires a second explicit local command
+      within 15 seconds and uses the controller's bounded six-second delay.
+    - Hardware power-off verification remains part of the next baseline test.
 - [ ] PSRAM test and allocator
 
 Exit condition: an interactive terminal survives repeated cold boots and forced
@@ -185,9 +188,16 @@ power interruptions without corrupting its boot metadata.
 - [ ] Work queues, timers, IPC, and capability checks
   - [x] Add a fixed-capacity deadline queue with per-loop execution budgets
   - [x] Add named deny-by-default capability evaluation
-  - [ ] Add versioned IPC messages and service ownership
+  - [x] Add versioned IPC messages and service ownership
+    - Service registrations, rather than untrusted callers, own capability
+      requirements; a boot-time self-test verifies privileged denial.
 - [ ] Device manager and attachment descriptors
+  - [x] Add a fixed-capacity device inventory and policy-visible states
+  - [ ] Parse and validate versioned attachment descriptors
 - [ ] Filesystem, settings, audit, and engagement-scope services
+  - [x] Add bounded root-only removable-file reads behind `storage.read`
+  - [x] Add an inactive-by-default, reference-and-expiry engagement state
+  - [ ] Add reviewed state-transition and persistence interfaces
 - [ ] Crash reporting and recovery UI
 - [ ] Structured audit service
   - [x] Add a bounded monotonic in-memory audit ring with no secret payloads
@@ -201,6 +211,17 @@ power interruptions without corrupting its boot metadata.
     - Hardware evidence: the accelerated command baseline operated on the
       physical unit; the follow-on terminal build scrolls at row 20 and wraps
       complete words when they fit within the 40-column line.
+  - [x] Add passive `scope` and `workbench` policy/status commands
+- [ ] Keyboard-driven GUI baseline
+  - [x] Add bounded Home and System menu state machines
+  - [x] Add keyboard focus navigation using the official CPI key codes
+  - [x] Add Status, Devices, Workbench, Audit, and Security screens
+  - [x] Add selectable read-only root file browsing and bounded viewing
+  - [x] Keep the command shell as an Advanced Terminal application
+  - [x] Add a persistent Cancel/Power Off confirmation without a typing timer
+  - [x] Add a locked Wi-Fi Update screen that cannot enable networking
+  - [ ] Verify GUI navigation and controlled power-off on hardware
+  - [ ] Replace text tiles with compositor-drawn synthwave widgets
 - [ ] Integrate pinned LVGL behind the PicoPen compositor and input services
 - [ ] Use Pico SDK-pinned TinyUSB and networking stacks behind capability checks
 
@@ -215,6 +236,13 @@ power interruptions without corrupting its boot metadata.
 ## Milestone 5: networking
 
 - [ ] Wi-Fi management and network diagnostics
+- [ ] Secure Wi-Fi software update
+  - [ ] Approve the production signature and key-rotation policy
+  - [ ] Approve an inactive update-slot and rollback flash layout
+  - [ ] Fetch a bounded signed manifest over authenticated TLS
+  - [ ] Verify board, version, bounds, digest, and signature before staging
+  - [ ] Require local approval before download, installation, and reboot
+  - [ ] Let the bootloader independently validate and roll back failed boots
 - [ ] Scoped TCP service identification
 - [ ] HTTP and TLS inspection
 - [ ] SSH client

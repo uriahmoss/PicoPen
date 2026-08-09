@@ -79,6 +79,12 @@ separate receive, analyze, and transmit capabilities.
 Long-lived services manage the terminal, storage, networking, attachments,
 engagement scope, secrets, and audit records.
 
+The primary local interface is a keyboard-driven GUI state machine. It uses
+bounded static screens and direct service calls through PicoPen policy checks;
+the command shell remains an explicitly selected advanced application. A later
+compositor may improve visual fidelity without changing navigation or service
+authorization semantics.
+
 ### Applications
 
 Applications request named capabilities. Sensitive operations require both an

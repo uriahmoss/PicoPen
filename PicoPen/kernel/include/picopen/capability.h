@@ -16,6 +16,7 @@ typedef enum picopen_capability {
     PICOPEN_CAP_USB_HID,
     PICOPEN_CAP_TARGET_POWER,
     PICOPEN_CAP_REMOTE_CONTROL,
+    PICOPEN_CAP_SYSTEM_SHUTDOWN,
     PICOPEN_CAPABILITY_COUNT,
 } picopen_capability_t;
 

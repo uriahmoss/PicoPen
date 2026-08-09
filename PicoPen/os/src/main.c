@@ -12,8 +12,12 @@
 #include "picopen/boot_metadata.h"
 #include "picopen/audit.h"
 #include "picopen/capability.h"
+#include "picopen/device.h"
+#include "picopen/engagement.h"
+#include "picopen/ipc.h"
 #include "picopen/display.h"
 #include "picopen/keyboard.h"
+#include "picopen/gui.h"
 #include "picopen/sd.h"
 #include "picopen/shell.h"
 #include "picopen/storage.h"
@@ -34,6 +38,18 @@ static void heartbeat(void *context_pointer) {
     printf("os-heartbeat: %llu ms\r\n", now_ms);
     (void)picopen_work_schedule(context->queue, now_ms + 5000u, heartbeat,
                                 context);
+}
+
+static bool system_status_handler(const picopen_ipc_message_t *request,
+                                  picopen_ipc_message_t *response,
+                                  void *owner) {
+    (void)owner;
+    if ((request == NULL) || (response == NULL) || (request->operation != 1u)) {
+        return false;
+    }
+    response->payload[0] = 1u;
+    response->payload_size = 1u;
+    return true;
 }
 
 int main(void) {
@@ -157,7 +173,7 @@ int main(void) {
         } else {
             picopen_terminal_write("ROOT: UNAVAILABLE\n");
         }
-        picopen_terminal_write("\n> ");
+        picopen_terminal_write("\nSTARTING GUI...\n");
         picopen_terminal_render();
     }
     printf("display: %s\r\n",
@@ -197,6 +213,67 @@ int main(void) {
                storage_listing.entries[index].directory ? "/" : "");
     }
 
+    picopen_device_manager_t devices;
+    picopen_device_manager_init(&devices);
+    (void)picopen_device_register(&devices, 1u, "DISPLAY",
+        display_ready ? PICOPEN_DEVICE_READY : PICOPEN_DEVICE_UNAVAILABLE,
+        false);
+    (void)picopen_device_register(&devices, 2u, "KEYBOARD",
+        keyboard_ready ? PICOPEN_DEVICE_READY : PICOPEN_DEVICE_UNAVAILABLE,
+        false);
+    (void)picopen_device_register(&devices, 3u, "SD",
+        sd_ready ? PICOPEN_DEVICE_READY_READ_ONLY : PICOPEN_DEVICE_UNAVAILABLE,
+        false);
+    (void)picopen_device_register(&devices, 4u, "FATFS",
+        storage_ready ? PICOPEN_DEVICE_READY_READ_ONLY
+                      : PICOPEN_DEVICE_UNAVAILABLE, false);
+    (void)picopen_device_register(&devices, 5u, "BATTERY",
+        battery_ready ? PICOPEN_DEVICE_READY : PICOPEN_DEVICE_UNAVAILABLE,
+        false);
+    (void)picopen_device_register(&devices, 6u, "PSRAM",
+        PICOPEN_DEVICE_UNVERIFIED, false);
+    (void)picopen_device_register(&devices, 7u, "WIFI",
+        PICOPEN_DEVICE_DISABLED_POLICY, false);
+    (void)picopen_device_register(&devices, 8u, "BLE",
+        PICOPEN_DEVICE_DISABLED_POLICY, false);
+    (void)picopen_device_register(&devices, 9u, "ATTACHMENTS",
+        PICOPEN_DEVICE_DISABLED_POLICY, true);
+
+    picopen_engagement_t engagement;
+    picopen_engagement_init(&engagement);
+    picopen_security_context_t shell_security = picopen_security_default();
+    shell_security.grants =
+        (UINT64_C(1) << PICOPEN_CAP_STORAGE_READ) |
+        (UINT64_C(1) << PICOPEN_CAP_SYSTEM_SHUTDOWN);
+
+    picopen_ipc_bus_t ipc;
+    picopen_ipc_init(&ipc);
+    const bool ipc_registered =
+        picopen_ipc_register(&ipc, 1u, PICOPEN_IPC_NO_CAPABILITY,
+                             system_status_handler, NULL) &&
+        picopen_ipc_register(&ipc, 2u, PICOPEN_CAP_RADIO_TRANSMIT,
+                             system_status_handler, NULL);
+    const picopen_ipc_message_t ipc_request = {
+        .version = PICOPEN_IPC_VERSION,
+        .service = 1u,
+        .operation = 1u,
+        .request_id = 1u,
+    };
+    picopen_ipc_message_t ipc_response;
+    const picopen_ipc_message_t denied_request = {
+        .version = PICOPEN_IPC_VERSION,
+        .service = 2u,
+        .operation = 1u,
+        .request_id = 2u,
+    };
+    picopen_ipc_message_t denied_response;
+    const bool ipc_ready = ipc_registered &&
+        (picopen_ipc_dispatch(&ipc, &shell_security, false, &ipc_request,
+                              &ipc_response) == PICOPEN_IPC_OK) &&
+        (ipc_response.payload_size == 1u) && (ipc_response.payload[0] == 1u) &&
+        (picopen_ipc_dispatch(&ipc, &shell_security, true, &denied_request,
+                              &denied_response) == PICOPEN_IPC_DENIED);
+
     const picopen_shell_state_t shell_state = {
         .keyboard_ready = keyboard_ready,
         .battery_ready = battery_ready,
@@ -204,9 +281,15 @@ int main(void) {
         .battery = battery_info,
         .sd = sd_info,
         .storage = storage_listing,
-        .security = picopen_security_default(),
+        .security = shell_security,
+        .devices = devices,
+        .engagement = engagement,
+        .ipc_ready = ipc_ready,
     };
     picopen_shell_init(&shell_state);
+    if (display_ready) {
+        picopen_gui_init(&shell_state);
+    }
 
     picopen_work_queue_t work_queue;
     picopen_work_queue_init(&work_queue);
@@ -218,7 +301,7 @@ int main(void) {
         picopen_key_event_t event;
         if (display_ready && keyboard_ready && picopen_keyboard_poll(&event) &&
             (event.state == PICOPEN_KEY_PRESSED)) {
-            picopen_shell_handle_key(event.key);
+            picopen_gui_handle_key(event.key);
             printf("key: 0x%02x state=%u\r\n", event.key, event.state);
         }
         const uint64_t now_ms = time_us_64() / 1000u;
