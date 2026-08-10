@@ -69,6 +69,12 @@ void picopen_internal_fs_init(void) {
 }
 
 picopen_internal_fs_state_t picopen_internal_fs_state(void) { return state; }
+size_t picopen_internal_fs_used_blocks(void) {
+    if (state != PICOPEN_INTERNAL_FS_READY) return 0u;
+    const lfs_ssize_t blocks = lfs_fs_size(&fs);
+    return blocks < 0 ? 0u : (size_t)blocks;
+}
+size_t picopen_internal_fs_total_blocks(void) { return FS_BLOCK_COUNT; }
 
 bool picopen_internal_fs_format(bool locally_confirmed) {
     if (!locally_confirmed || state == PICOPEN_INTERNAL_FS_READY) return false;
@@ -95,14 +101,13 @@ bool picopen_internal_fs_read(const char *path, void *data, size_t capacity,
 
 bool picopen_internal_fs_replace(const char *path, const void *data, size_t length) {
     if (state != PICOPEN_INTERNAL_FS_READY || !path || !data || length > 1024u) return false;
-    const char *temporary = "/wifi.tmp";
+    const char *temporary = "/replace.tmp";
     lfs_file_t file;
     if (lfs_file_open(&fs, &file, temporary, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) != LFS_ERR_OK) return false;
     bool ok = lfs_file_write(&fs, &file, data, length) == (lfs_ssize_t)length &&
               lfs_file_sync(&fs, &file) == LFS_ERR_OK;
     ok = lfs_file_close(&fs, &file) == LFS_ERR_OK && ok;
     if (!ok) { (void)lfs_remove(&fs, temporary); return false; }
-    (void)lfs_remove(&fs, path);
     return lfs_rename(&fs, temporary, path) == LFS_ERR_OK;
 }
 

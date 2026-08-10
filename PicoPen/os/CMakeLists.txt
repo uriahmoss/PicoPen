@@ -18,7 +18,9 @@ add_executable(picopen_os
     ../services/workbench/workbench.c
     ../services/network/wifi.c
     ../services/settings/internal_fs.c
+    ../services/settings/preferences.c
     ../services/vault/wifi_vault.c
+    ../services/recovery/recovery.c
     ../services/policy/engagement.c
     ../third_party/fatfs/ff.c
     ../third_party/littlefs/lfs.c
@@ -34,12 +36,13 @@ target_link_libraries(picopen_os PRIVATE
     hardware_spi
     hardware_i2c
     hardware_resets
-    pico_cyw43_arch_poll
+    pico_cyw43_arch_lwip_poll
     pico_mbedtls
     picopen_boot_metadata
 )
 target_include_directories(picopen_os PRIVATE
     ${PROJECT_SOURCE_DIR}/boards/picocalc_pico2w/include
+    ${PROJECT_SOURCE_DIR}/config
     ${PROJECT_SOURCE_DIR}/kernel/include
     ${PROJECT_SOURCE_DIR}/drivers/display/include
     ${PROJECT_SOURCE_DIR}/drivers/keyboard/include
@@ -55,12 +58,12 @@ target_include_directories(picopen_os PRIVATE
     ${PROJECT_SOURCE_DIR}/services/network/include
     ${PROJECT_SOURCE_DIR}/services/settings/include
     ${PROJECT_SOURCE_DIR}/services/vault/include
+    ${PROJECT_SOURCE_DIR}/services/recovery/include
     ${PROJECT_SOURCE_DIR}/services/policy/include
     ${PROJECT_SOURCE_DIR}/third_party/fatfs
     ${PROJECT_SOURCE_DIR}/third_party/littlefs
 )
 target_compile_definitions(picopen_os PRIVATE
-    CYW43_LWIP=0
     PICO_CRT0_INCLUDE_PICOBIN_ENTRY_POINT_ITEM=1
     PICO_CRT0_INCLUDE_PICOBIN_VECTOR_TABLE_ITEM=1
     PICO_STDIO_USB_CONNECTION_WITHOUT_DTR=1

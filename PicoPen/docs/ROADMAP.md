@@ -57,7 +57,13 @@ review gates and are never implied by acceleration.
     it immediately after driver handoff, and never log it
   - [x] Add link state/error diagnostics without linking IP, socket, listener,
     portal, or update-install code
-  - Passive access-point inventory and interface diagnostics
+  - [x] Add a bounded lwIP polling core with DHCP plus local IPv4, gateway,
+    DNS, RSSI, and lease-state diagnostics; sockets and TCP remain compiled out
+  - [x] Select scanned access points directly without active probing
+    - Hardware evidence: scan selection, association, DHCP diagnostics, saved
+      preference restoration, storage health, and recovery navigation behaved
+      as expected in the combined physical-device test.
+  - [x] Passive access-point inventory and interface diagnostics
   - Locked online update and both locally launched portal modes
   - Bounded package streaming and shared validation interfaces
   - No installation until signature and inactive-slot contracts are approved
@@ -259,8 +265,10 @@ power interruptions without corrupting its boot metadata.
   - [ ] Separate evidence export and privileged mutation into independently
     authorized interfaces; removable read access is now separate
   - Require explicit capability and local policy for every SD write
-  - [ ] Add a user-facing safe-remove action and verify live media-change
-    reporting on hardware
+  - [x] Add user-facing safe-remove and explicit rescan actions with media
+    generation reporting
+    - Hardware evidence: safe removal and rescan behaved as expected on the
+      PicoCalc/Pico 2 W test unit without exposing SD mutation.
   - [ ] Add a service-level operation deadline after the timer contract is
     connected to the block transport
 - [ ] **Slice 3D:** Add pinned littlefs for internal settings and audit journals
@@ -273,6 +281,11 @@ power interruptions without corrupting its boot metadata.
       load, masked credential handling, and explicit forget operated as
       expected on the PicoCalc/Pico 2 W test unit.
   - [ ] Persist non-secret settings and authenticated audit journals
+    - [x] Persist a versioned, checksummed default skin and bounded Home,
+      System, and Files menu memory through atomic littlefs replacement
+      - Hardware evidence: the selected skin and committed menu positions
+        survived a normal device restart.
+    - [ ] Persist authenticated audit journals
   - Test interrupted updates and full-media behavior
 - [ ] Work queues, timers, IPC, and capability checks
   - [x] Add a fixed-capacity deadline queue with per-loop execution budgets
@@ -289,7 +302,7 @@ power interruptions without corrupting its boot metadata.
   - [x] Add bounded activation, explicit deactivation, and expiry transitions
     requiring local UI action
   - [ ] Add reviewed persistence interfaces
-- [ ] Crash reporting and recovery UI
+- [x] Add bounded watchdog crash records and a recovery/storage-health UI
 - [ ] Structured audit service
   - [x] Add a bounded monotonic in-memory audit ring with no secret payloads
   - [ ] Persist authenticated audit records after the littlefs layout is
@@ -393,6 +406,9 @@ power interruptions without corrupting its boot metadata.
     credentials, network stack, sockets, or listeners in the first slice
   - [x] Add saved-network selection without plaintext credentials or logs
   - [x] Add passive access-point, signal, channel, and interface status views
+  - [x] Add DHCP, IPv4, gateway, DNS, RSSI, and lease diagnostics with TCP,
+    sockets, and listeners disabled
+  - [x] Add direct selection from the bounded passive scan inventory
   - Separate connection, passive observation, and active probing capabilities
 - [ ] Secure Wi-Fi software update
   - [ ] Approve the production signature and key-rotation policy

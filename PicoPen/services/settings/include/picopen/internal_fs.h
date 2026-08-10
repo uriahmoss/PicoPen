@@ -13,6 +13,8 @@ typedef enum picopen_internal_fs_state {
 
 void picopen_internal_fs_init(void);
 picopen_internal_fs_state_t picopen_internal_fs_state(void);
+size_t picopen_internal_fs_used_blocks(void);
+size_t picopen_internal_fs_total_blocks(void);
 bool picopen_internal_fs_format(bool locally_confirmed);
 bool picopen_internal_fs_read(const char *path, void *data, size_t capacity,
                               size_t *length);

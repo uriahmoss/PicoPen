@@ -11,6 +11,8 @@
 #include "picopen/display.h"
 #include "picopen/keyboard.h"
 #include "picopen/internal_fs.h"
+#include "picopen/preferences.h"
+#include "picopen/recovery.h"
 #include "picopen/skin.h"
 #include "picopen/storage.h"
 #include "picopen/synthwave_renderer.h"
@@ -21,7 +23,7 @@
 
 #define GUI_SCREEN_SIZE 1024u
 #define GUI_HOME_ITEMS 6u
-#define GUI_SYSTEM_ITEMS 6u
+#define GUI_SYSTEM_ITEMS 7u
 #define GUI_SECURITY_ITEMS 3u
 #define GUI_WIFI_ITEMS 9u
 
@@ -49,6 +51,7 @@ typedef enum gui_screen {
     GUI_UPDATE,
     GUI_SKINS,
     GUI_ABOUT,
+    GUI_RECOVERY,
     GUI_SHUTDOWN,
     GUI_SHUTDOWN_RESULT,
     GUI_TERMINAL,
@@ -71,7 +74,9 @@ static char wifi_password[64];
 static size_t wifi_password_length;
 static char wifi_pin[PICOPEN_VAULT_PIN_SIZE];
 static size_t wifi_pin_length;
+static size_t wifi_ap_selection;
 static picopen_vault_result_t wifi_vault_result = PICOPEN_VAULT_EMPTY;
+static picopen_gui_storage_action_t storage_action;
 static char canvas[GUI_SCREEN_SIZE];
 static char canvas_title[20];
 static size_t canvas_length;
@@ -437,7 +442,7 @@ static void render_files(void) {
         append(selection == index ? "> %-24.24s%s\n" : "  %-24.24s%s\n",
                entry->name, entry->directory ? "/" : "");
     }
-    append("\nUP/DOWN  ENTER OPEN  ESC BACK\n");
+    append("\nUP/DOWN ENTER OPEN S SAFE REMOVE\nR RESCAN  ESC BACK\n");
     present();
 }
 
@@ -547,7 +552,7 @@ static void render_audit(void) {
 
 static void render_system(void) {
     static const char *const labels[GUI_SYSTEM_ITEMS] = {
-        "SECURITY", "WIFI UPDATE", "SKINS", "TERMINAL", "POWER", "ABOUT",
+        "SECURITY", "WIFI UPDATE", "SKINS", "TERMINAL", "RECOVERY", "POWER", "ABOUT",
     };
     begin("SYSTEM");
     append("\n");
@@ -556,6 +561,24 @@ static void render_system(void) {
     }
     append("\nUP/DOWN  ENTER SELECT  ESC BACK\n");
     present();
+}
+
+static void render_recovery(void) {
+    begin("RECOVERY");
+    picopen_crash_record_t crash;
+    append("\nINTERNAL STORE %s\n",
+        picopen_internal_fs_state()==PICOPEN_INTERNAL_FS_READY ? "READY" :
+        picopen_internal_fs_state()==PICOPEN_INTERNAL_FS_UNINITIALIZED ? "UNINITIALIZED" : "ERROR");
+    append("FLASH BLOCKS %u/%u USED\n",
+           (unsigned int)picopen_internal_fs_used_blocks(),
+           (unsigned int)picopen_internal_fs_total_blocks());
+    if (picopen_recovery_get(&crash))
+        append("CRASH RECORDS %lu\nLAST REASON 0X%08lX\n",(unsigned long)crash.count,(unsigned long)crash.reason);
+    else append("CRASH RECORDS NONE\n");
+    append("SD STATE %d GEN %lu\n\n",(int)gui_state.storage_service.media_state,
+           (unsigned long)gui_state.storage_service.media_generation);
+    append(selection==0u ? "> CLEAR CRASH RECORD\n" : "  CLEAR CRASH RECORD\n");
+    append("\nENTER SELECT  ESC BACK\n"); present();
 }
 
 static void render_skins(void) {
@@ -617,12 +640,24 @@ static void render_update(void) {
     append(selection == 6u ? "> %s\n" : "  %s\n",
            picopen_wifi_vault_present() ? "LOAD SAVED" : "REMEMBER");
     append(selection == 7u ? "> %s\n" : "  %s\n",
-           wifi.state == PICOPEN_WIFI_CONNECTED ? "DISCONNECT" : "CONNECT");
+           wifi.state == PICOPEN_WIFI_CONNECTED ? "DISCONNECT" :
+           wifi.state == PICOPEN_WIFI_CONNECTING ? "CANCEL" : "CONNECT");
     append(selection == 8u ? "> FORGET SAVED\n" : "  FORGET SAVED\n");
     append("APS %u%s", (unsigned int)wifi.ap_count,
            wifi.ap_truncated ? "+" : "");
-    if (wifi.ap_count) append(" %-19.19s %ddBm", wifi.aps[0].ssid, wifi.aps[0].rssi);
-    append("\nVAULT:%s RETRY:%us  NO LISTENERS\nENTER SELECT  ESC BACK\n",
+    if (wifi.ap_count) {
+        if (wifi_ap_selection >= wifi.ap_count) wifi_ap_selection = 0u;
+        append(" %u:%-14.14s %ddBm C%u", (unsigned int)(wifi_ap_selection + 1u),
+               wifi.aps[wifi_ap_selection].ssid,
+               wifi.aps[wifi_ap_selection].rssi,
+               wifi.aps[wifi_ap_selection].channel);
+    }
+    append("\nIP:%-15s GW:%-15s\nDNS:%-15s RSSI:%ld DHCP:%s\n",
+           wifi.ipv4[0] ? wifi.ipv4 : "WAITING",
+           wifi.gateway[0] ? wifi.gateway : "-",
+           wifi.dns[0] ? wifi.dns : "-", (long)wifi.rssi,
+           wifi.dhcp_bound ? "BOUND" : "WAIT");
+    append("VAULT:%s RETRY:%us NO LISTENERS\n",
            picopen_wifi_vault_result_name(wifi_vault_result),
            picopen_wifi_vault_retry_seconds(time_us_64() / 1000u));
     present();
@@ -668,6 +703,7 @@ static void render(void) {
         case GUI_UPDATE: render_update(); break;
         case GUI_SKINS: render_skins(); break;
         case GUI_ABOUT: render_about(); break;
+        case GUI_RECOVERY: render_recovery(); break;
         case GUI_SHUTDOWN: render_shutdown(); break;
         case GUI_SHUTDOWN_RESULT: break;
         case GUI_TERMINAL: break;
@@ -679,6 +715,8 @@ static void open_home_item(void) {
         GUI_STATUS, GUI_FILES, GUI_DEVICES, GUI_WORKBENCH, GUI_AUDIT, GUI_SYSTEM,
     };
     home_selection = selection;
+    (void)picopen_preferences_set_menu(home_selection, system_selection,
+                                       files_selection);
     screen = screens[selection];
     if (screen == GUI_SYSTEM) {
         selection = system_selection;
@@ -692,10 +730,12 @@ static void open_home_item(void) {
 
 static void open_system_item(void) {
     static const gui_screen_t screens[GUI_SYSTEM_ITEMS] = {
-        GUI_SECURITY, GUI_UPDATE, GUI_SKINS, GUI_TERMINAL, GUI_SHUTDOWN,
-        GUI_ABOUT,
+        GUI_SECURITY, GUI_UPDATE, GUI_SKINS, GUI_TERMINAL, GUI_RECOVERY,
+        GUI_SHUTDOWN, GUI_ABOUT,
     };
     system_selection = selection;
+    (void)picopen_preferences_set_menu(home_selection, system_selection,
+                                       files_selection);
     screen = screens[selection];
     selection = screen == GUI_SKINS ? (size_t)picopen_skin_current_id() : 0u;
     if (screen == GUI_TERMINAL) {
@@ -715,6 +755,7 @@ static gui_screen_t parent_screen(gui_screen_t current) {
     }
     if ((current == GUI_SECURITY) || (current == GUI_UPDATE) ||
         (current == GUI_SKINS) || (current == GUI_ABOUT) ||
+        (current == GUI_RECOVERY) ||
         (current == GUI_SHUTDOWN) ||
         (current == GUI_SHUTDOWN_RESULT)) {
         return GUI_SYSTEM;
@@ -728,11 +769,16 @@ void picopen_gui_init(const picopen_shell_state_t *state) {
         file_listing = state->storage;
     }
     strcpy(file_path, "/");
+    picopen_preferences_t preferences;
+    picopen_preferences_get(&preferences);
     screen = GUI_HOME;
-    selection = 0u;
-    home_selection = 0u;
-    system_selection = 0u;
-    files_selection = 0u;
+    home_selection = preferences.home_selection < GUI_HOME_ITEMS
+        ? preferences.home_selection : 0u;
+    system_selection = preferences.system_selection < GUI_SYSTEM_ITEMS
+        ? preferences.system_selection : 0u;
+    files_selection = preferences.files_selection < PICOPEN_STORAGE_MAX_ENTRIES
+        ? preferences.files_selection : 0u;
+    selection = home_selection;
     picopen_audit_record("gui.start", true);
     render();
 }
@@ -829,6 +875,9 @@ void picopen_gui_handle_key(uint8_t key) {
         const gui_screen_t previous_screen = screen;
         if ((previous_screen == GUI_FILES) && (strcmp(file_path, "/") == 0)) {
             files_selection = selection;
+            (void)picopen_preferences_set_menu(home_selection,
+                                               system_selection,
+                                               files_selection);
         }
         screen = parent_screen(screen);
         if ((screen == GUI_FILES) && (selection >= file_listing.count)) {
@@ -865,6 +914,14 @@ void picopen_gui_handle_key(uint8_t key) {
         return;
     }
     if (screen == GUI_FILES) {
+        if ((key == 's') || (key == 'S')) {
+            storage_action = PICOPEN_GUI_STORAGE_SAFE_REMOVE;
+            return;
+        }
+        if ((key == 'r') || (key == 'R')) {
+            storage_action = PICOPEN_GUI_STORAGE_RESCAN;
+            return;
+        }
         const size_t count = file_listing.count;
         if ((key == PICOPEN_KEY_UP) && (selection > 0u)) --selection;
         if ((key == PICOPEN_KEY_DOWN) && (selection + 1u < count)) ++selection;
@@ -963,7 +1020,23 @@ void picopen_gui_handle_key(uint8_t key) {
     if (screen == GUI_UPDATE) {
         if ((key == PICOPEN_KEY_UP) && (selection > 0u)) --selection;
         else if ((key == PICOPEN_KEY_DOWN) && (selection + 1u < GUI_WIFI_ITEMS)) ++selection;
-        else if (((key == 0x08u) || (key == 0x7Fu)) &&
+        else if ((selection == 3u) &&
+                 ((key == PICOPEN_KEY_LEFT) || (key == PICOPEN_KEY_RIGHT))) {
+            picopen_wifi_status_t wifi;
+            picopen_wifi_get_status(&wifi);
+            if (wifi.ap_count > 0u) {
+                if (key == PICOPEN_KEY_LEFT) {
+                    wifi_ap_selection = wifi_ap_selection == 0u
+                        ? wifi.ap_count - 1u : wifi_ap_selection - 1u;
+                } else {
+                    wifi_ap_selection = (wifi_ap_selection + 1u) % wifi.ap_count;
+                }
+                if (picopen_wifi_select_ap(wifi_ap_selection, wifi_ssid,
+                                           sizeof(wifi_ssid))) {
+                    wifi_ssid_length = strlen(wifi_ssid);
+                }
+            }
+        } else if (((key == 0x08u) || (key == 0x7Fu)) &&
                  ((selection >= 3u) && (selection <= 5u))) {
             char *value = selection == 3u ? wifi_ssid : selection == 4u ? wifi_password : wifi_pin;
             size_t *length = selection == 3u ? &wifi_ssid_length : selection == 4u ? &wifi_password_length : &wifi_pin_length;
@@ -1010,7 +1083,9 @@ void picopen_gui_handle_key(uint8_t key) {
                 changed = wifi_vault_result == PICOPEN_VAULT_OK;
                 scrub_secret(wifi_pin, sizeof(wifi_pin)); wifi_pin_length = 0u;
                 picopen_audit_record("vault.save", changed);
-            } else if (selection == 7u && wifi.state == PICOPEN_WIFI_CONNECTED) {
+            } else if (selection == 7u &&
+                       (wifi.state == PICOPEN_WIFI_CONNECTED ||
+                        wifi.state == PICOPEN_WIFI_CONNECTING)) {
                 changed = picopen_wifi_disconnect(true);
                 picopen_audit_record("wifi.disconnect", changed);
             } else if (selection == 7u) {
@@ -1040,9 +1115,11 @@ void picopen_gui_handle_key(uint8_t key) {
         if ((key == PICOPEN_KEY_DOWN) && (selection + 1u < PICOPEN_SKIN_COUNT)) ++selection;
         if (key == PICOPEN_KEY_ENTER) {
             (void)picopen_skin_select((picopen_skin_id_t)selection);
+            const bool persisted = picopen_preferences_set_skin((uint8_t)selection);
             picopen_crayon_renderer_invalidate();
             picopen_synthwave_renderer_invalidate();
             picopen_audit_record("skin.select", true);
+            picopen_audit_record("skin.persist", persisted);
             screen = GUI_HOME;
             selection = home_selection;
             render_home();
@@ -1050,6 +1127,13 @@ void picopen_gui_handle_key(uint8_t key) {
         }
         render_skins();
         return;
+    }
+    if (screen == GUI_RECOVERY) {
+        if (key == PICOPEN_KEY_ENTER) {
+            const bool cleared=picopen_recovery_clear(true);
+            picopen_audit_record("crash.clear",cleared);
+        }
+        render_recovery(); return;
     }
     if (screen == GUI_SHUTDOWN) {
         if ((key == PICOPEN_KEY_UP) || (key == PICOPEN_KEY_DOWN)) selection ^= 1u;
@@ -1070,4 +1154,9 @@ void picopen_gui_handle_key(uint8_t key) {
         }
         render_shutdown();
     }
+}
+
+picopen_gui_storage_action_t picopen_gui_take_storage_action(void) {
+    const picopen_gui_storage_action_t action=storage_action;
+    storage_action=PICOPEN_GUI_STORAGE_NONE; return action;
 }

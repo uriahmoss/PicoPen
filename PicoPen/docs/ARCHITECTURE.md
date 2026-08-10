@@ -79,6 +79,17 @@ separate receive, analyze, and transmit capabilities.
 Long-lived services manage the terminal, storage, networking, attachments,
 engagement scope, secrets, and audit records.
 
+The networking service owns CYW43 and lwIP polling, association deadlines,
+DHCP state, and sanitized local diagnostics. The baseline compiles out TCP,
+sockets, and netconn APIs; adding a listener requires a separately reviewed
+service contract and explicit local activation. Passive scan selection and IP
+diagnostics do not grant probing or remote-control capabilities.
+
+The internal settings service owns the reserved littlefs region. Non-secret
+preferences are versioned and checksummed, secrets use the separately
+authenticated vault format, and watchdog recovery records are fixed-size.
+Atomic replacement is the only general settings mutation primitive.
+
 The primary local interface is a keyboard-driven GUI state machine. It uses
 bounded static screens and direct service calls through PicoPen policy checks;
 the command shell remains an explicitly selected advanced application. A later

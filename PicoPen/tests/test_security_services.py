@@ -200,8 +200,23 @@ class SecurityServiceBaselineTests(unittest.TestCase):
         self.assertIn(".state = PICOPEN_WIFI_OFF", wifi)
         self.assertIn("cyw43_arch_disable_sta_mode", wifi)
         self.assertIn("PICOPEN_CAP_NETWORK_CONNECT", capability)
-        self.assertIn("pico_cyw43_arch_poll", cmake)
-        self.assertNotIn("pico_cyw43_arch_lwip", cmake)
+        self.assertIn("pico_cyw43_arch_lwip_poll", cmake)
+        self.assertIn("LWIP_SOCKET 0", (ROOT / "config" / "lwipopts.h").read_text(encoding="utf-8"))
+        self.assertIn("LWIP_TCP 0", (ROOT / "config" / "lwipopts.h").read_text(encoding="utf-8"))
+
+    def test_network_preferences_and_recovery_fast_track(self):
+        wifi = (ROOT / "services" / "network" / "wifi.c").read_text(encoding="utf-8")
+        gui = (ROOT / "services" / "gui" / "gui.c").read_text(encoding="utf-8")
+        preferences = (ROOT / "services" / "settings" / "preferences.c").read_text(encoding="utf-8")
+        recovery = (ROOT / "services" / "recovery" / "recovery.c").read_text(encoding="utf-8")
+        self.assertIn("netif_default", wifi)
+        self.assertIn("dns_getserver", wifi)
+        self.assertIn("picopen_wifi_select_ap", gui)
+        self.assertIn("PREFERENCES_VERSION 1u", preferences)
+        self.assertIn("offsetof(picopen_preferences_t, checksum)", preferences)
+        self.assertIn("PICOPEN_BOOT_ATTEMPT_OS_ENTERED", recovery)
+        self.assertIn("PICOPEN_GUI_STORAGE_SAFE_REMOVE", gui)
+        self.assertIn("PICOPEN_GUI_STORAGE_RESCAN", gui)
 
     def test_graphical_home_uses_bounded_direct_widgets(self):
         terminal = (ROOT / "drivers" / "terminal" / "terminal.c").read_text(

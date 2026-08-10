@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define PICOPEN_WIFI_ABI_VERSION 1u
+#define PICOPEN_WIFI_ABI_VERSION 2u
 #define PICOPEN_WIFI_AP_CAPACITY 6u
 #define PICOPEN_WIFI_SSID_SIZE 33u
 
@@ -33,12 +33,18 @@ typedef struct picopen_wifi_status {
     size_t ap_count;
     bool ap_truncated;
     int link_status;
+    bool dhcp_bound;
+    char ipv4[16];
+    char gateway[16];
+    char dns[16];
+    int32_t rssi;
     picopen_wifi_ap_t aps[PICOPEN_WIFI_AP_CAPACITY];
 } picopen_wifi_status_t;
 
 void picopen_wifi_init(void);
 bool picopen_wifi_enable(bool locally_confirmed);
 bool picopen_wifi_scan_passive(bool locally_confirmed);
+bool picopen_wifi_select_ap(size_t index, char *ssid, size_t capacity);
 bool picopen_wifi_connect(const char *ssid, char *password,
                           bool locally_confirmed, uint64_t now_ms);
 bool picopen_wifi_disconnect(bool locally_confirmed);

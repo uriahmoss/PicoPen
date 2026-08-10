@@ -17,6 +17,8 @@
 #include "picopen/engagement.h"
 #include "picopen/ipc.h"
 #include "picopen/internal_fs.h"
+#include "picopen/preferences.h"
+#include "picopen/recovery.h"
 #include "picopen/display.h"
 #include "picopen/keyboard.h"
 #include "picopen/gui.h"
@@ -109,6 +111,7 @@ int main(void) {
             PICOPEN_BOOT_ATTEMPT_METADATA_ERROR;
         watchdog_reboot(0u, 0u, 0u);
     }
+    const uint32_t previous_boot_failure = metadata.last_failure;
     metadata.flags = PICOPEN_BOOT_FLAG_CONFIRMED;
     metadata.attempt_count = 0u;
     metadata.last_failure = 0u;
@@ -124,6 +127,11 @@ int main(void) {
     picopen_workbench_init();
     picopen_engagement_session_init();
     picopen_internal_fs_init();
+    picopen_recovery_init(previous_boot_failure != 0u, previous_boot_failure);
+    picopen_preferences_init();
+    picopen_preferences_t preferences;
+    picopen_preferences_get(&preferences);
+    (void)picopen_skin_select((picopen_skin_id_t)preferences.skin);
     picopen_wifi_init();
 
     printf("\r\nPicoPen minimal OS\r\n");
@@ -358,6 +366,36 @@ int main(void) {
             (event.state == PICOPEN_KEY_PRESSED)) {
             picopen_gui_handle_key(event.key);
             printf("key: 0x%02x state=%u\r\n", event.key, event.state);
+        }
+        const picopen_gui_storage_action_t storage_action =
+            picopen_gui_take_storage_action();
+        if (storage_action != PICOPEN_GUI_STORAGE_NONE) {
+            if (storage_action == PICOPEN_GUI_STORAGE_SAFE_REMOVE) {
+                picopen_sd_close();
+                picopen_storage_safe_remove(&storage_service);
+                sd_ready = false;
+                storage_ready = false;
+                storage_listing = (picopen_storage_listing_t){0};
+                picopen_audit_record("sd.safe_remove", true);
+            } else {
+                picopen_storage_media_changed(&storage_service);
+                sd_ready = picopen_sd_identify(&sd_info);
+                if (sd_ready) picopen_storage_media_ready(&storage_service);
+                storage_listing = (picopen_storage_listing_t){0};
+                const picopen_storage_result_t result = sd_ready
+                    ? picopen_storage_list_directory(&storage_service, "/", &storage_listing)
+                    : PICOPEN_STORAGE_NOT_READY;
+                storage_ready = result == PICOPEN_STORAGE_OK ||
+                                result == PICOPEN_STORAGE_LIMIT_REACHED;
+                picopen_audit_record("sd.rescan", storage_ready);
+            }
+            shell_state.storage_ready = storage_ready;
+            shell_state.sd = sd_info;
+            shell_state.storage_service = storage_service;
+            shell_state.storage = storage_listing;
+            synchronize_device_states(&shell_state);
+            picopen_shell_update_state(&shell_state);
+            picopen_gui_update_state(&shell_state);
         }
         const uint64_t now_ms = time_us_64() / 1000u;
         picopen_wifi_poll();
