@@ -16,6 +16,7 @@ add_executable(picopen_os
     ../services/audit/audit.c
     ../services/device/device.c
     ../services/workbench/workbench.c
+    ../services/network/wifi.c
     ../services/policy/engagement.c
     ../third_party/fatfs/ff.c
     src/main.c
@@ -29,6 +30,7 @@ target_link_libraries(picopen_os PRIVATE
     hardware_spi
     hardware_i2c
     hardware_resets
+    pico_cyw43_arch_none
     picopen_boot_metadata
 )
 target_include_directories(picopen_os PRIVATE
@@ -45,6 +47,7 @@ target_include_directories(picopen_os PRIVATE
     ${PROJECT_SOURCE_DIR}/services/audit/include
     ${PROJECT_SOURCE_DIR}/services/device/include
     ${PROJECT_SOURCE_DIR}/services/workbench/include
+    ${PROJECT_SOURCE_DIR}/services/network/include
     ${PROJECT_SOURCE_DIR}/services/policy/include
     ${PROJECT_SOURCE_DIR}/third_party/fatfs
 )

@@ -12,7 +12,8 @@ static bool requires_engagement(picopen_capability_t capability) {
 }
 
 static bool requires_local_confirmation(picopen_capability_t capability) {
-    return (capability == PICOPEN_CAP_RADIO_TRANSMIT) ||
+    return (capability == PICOPEN_CAP_NETWORK_CONNECT) ||
+           (capability == PICOPEN_CAP_RADIO_TRANSMIT) ||
            (capability == PICOPEN_CAP_GPIO_DRIVE) ||
            (capability == PICOPEN_CAP_USB_HID) ||
            (capability == PICOPEN_CAP_TARGET_POWER) ||

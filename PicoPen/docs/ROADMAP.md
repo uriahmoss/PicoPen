@@ -44,7 +44,13 @@ review gates and are never implied by acceleration.
   - [x] Keep GPIO drive, target power, emulation, probing, and transmission
     absent from this bundle's service
 - [ ] **Bundle C: Wi-Fi and update transport foundation**
-  - Wi-Fi disabled by default with locally approved connection management
+  - [x] Add an ABI-versioned Wi-Fi lifecycle service that starts fully off and
+    requires a locally confirmed `network.connect` capability before bringing
+    up an unassociated station interface
+  - [x] Add local interface disable/recovery, driver result, transition count,
+    audit events, and device-state reporting
+  - [ ] Add locally approved connection management without plaintext credential
+    persistence or logging
   - Passive access-point inventory and interface diagnostics
   - Locked online update and both locally launched portal modes
   - Bounded package streaming and shared validation interfaces
@@ -368,7 +374,9 @@ power interruptions without corrupting its boot metadata.
 ## Milestone 5: networking
 
 - [ ] Wi-Fi management and network diagnostics
-  - Keep Wi-Fi disabled until locally enabled
+  - [x] Keep Wi-Fi and the CYW43 driver uninitialized until locally enabled
+  - [x] Bring up only an unassociated diagnostic interface with no scan,
+    credentials, network stack, sockets, or listeners in the first slice
   - Add saved-network selection without plaintext credentials or logs
   - Add passive access-point, signal, channel, and interface status views
   - Separate connection, passive observation, and active probing capabilities

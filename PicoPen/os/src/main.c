@@ -26,6 +26,7 @@
 #include "picopen/terminal.h"
 #include "picopen/work_queue.h"
 #include "picopen/workbench.h"
+#include "picopen/wifi.h"
 
 #ifndef PICOPEN_VERSION
 #define PICOPEN_VERSION "unknown"
@@ -121,6 +122,7 @@ int main(void) {
     picopen_skin_init();
     picopen_workbench_init();
     picopen_engagement_session_init();
+    picopen_wifi_init();
 
     printf("\r\nPicoPen minimal OS\r\n");
     printf("version: %s\r\n", PICOPEN_VERSION);
@@ -288,6 +290,7 @@ int main(void) {
     picopen_security_context_t shell_security = picopen_security_default();
     shell_security.grants =
         (UINT64_C(1) << PICOPEN_CAP_STORAGE_READ) |
+        (UINT64_C(1) << PICOPEN_CAP_NETWORK_CONNECT) |
         (UINT64_C(1) << PICOPEN_CAP_SYSTEM_SHUTDOWN);
 
     picopen_ipc_bus_t ipc;
@@ -344,6 +347,7 @@ int main(void) {
 
     uint64_t next_device_health_ms =
         time_us_64() / 1000u + PICOPEN_DEVICE_HEALTH_MS;
+    picopen_wifi_state_t last_wifi_state = PICOPEN_WIFI_OFF;
 
     for (;;) {
         picopen_key_event_t event;
@@ -353,6 +357,22 @@ int main(void) {
             printf("key: 0x%02x state=%u\r\n", event.key, event.state);
         }
         const uint64_t now_ms = time_us_64() / 1000u;
+        picopen_wifi_poll();
+        picopen_wifi_status_t wifi_status;
+        picopen_wifi_get_status(&wifi_status);
+        if (wifi_status.state != last_wifi_state) {
+            last_wifi_state = wifi_status.state;
+            const picopen_device_state_t device_state =
+                wifi_status.state == PICOPEN_WIFI_READY_UNASSOCIATED
+                    ? PICOPEN_DEVICE_READY_LOCAL_ONLY
+                    : (wifi_status.state == PICOPEN_WIFI_OFF
+                           ? PICOPEN_DEVICE_DISABLED_POLICY
+                           : PICOPEN_DEVICE_UNAVAILABLE);
+            (void)picopen_device_set_state(&shell_state.devices,
+                                           PICOPEN_DEVICE_WIFI, device_state);
+            picopen_shell_update_state(&shell_state);
+            picopen_gui_update_state(&shell_state);
+        }
         const bool scope_expired = picopen_engagement_session_poll(now_ms);
         picopen_engagement_t current_engagement;
         picopen_engagement_session_snapshot(&current_engagement);

@@ -47,7 +47,7 @@ bool picopen_device_set_state(picopen_device_manager_t *manager,
 
 const char *picopen_device_state_name(picopen_device_state_t state) {
     static const char *const names[] = {
-        "DOWN", "READY-RO", "READY", "DISABLED", "UNVERIFIED",
+        "DOWN", "READY-RO", "READY", "DISABLED", "UNVERIFIED", "READY-LOCAL",
     };
     if ((unsigned int)state >= sizeof(names) / sizeof(names[0])) {
         return "UNKNOWN";

@@ -15,6 +15,7 @@
 #include "picopen/synthwave_renderer.h"
 #include "picopen/terminal.h"
 #include "picopen/workbench.h"
+#include "picopen/wifi.h"
 
 #define GUI_SCREEN_SIZE 1024u
 #define GUI_HOME_ITEMS 6u
@@ -582,8 +583,16 @@ static void render_security(void) {
 
 static void render_update(void) {
     begin("WIFI UPDATE");
-    append("\n        NOT CONFIGURED\n\nWIFI REMAINS DISABLED BY POLICY\n\n"
-           "REQUIRES:\n- SIGNATURE POLICY\n- INACTIVE UPDATE SLOT\n"
+    picopen_wifi_status_t wifi;
+    picopen_wifi_get_status(&wifi);
+    append("\nINTERFACE  %s\nDRIVER     %d\nTRANSITIONS %lu\n\n",
+           picopen_wifi_state_name(wifi.state), wifi.driver_result,
+           (unsigned long)wifi.transition_count);
+    append(wifi.state == PICOPEN_WIFI_OFF
+        ? "> ENTER ENABLE INTERFACE\n" : "> ENTER DISABLE INTERFACE\n");
+    append("\nNO CREDENTIALS / NO ASSOCIATION\nNO SCAN / NO LISTENERS\n\n"
+           "UPDATE INSTALL REMAINS LOCKED\nREQUIRES:\n"
+           "- SIGNATURE POLICY\n- INACTIVE UPDATE SLOT\n"
            "- BOOTLOADER ROLLBACK CONTRACT\n- LOCAL APPROVAL\n\n"
            "UNSIGNED UPDATES: DENIED\n\nESC BACK\n");
     present();
@@ -917,6 +926,25 @@ void picopen_gui_handle_key(uint8_t key) {
             }
         }
         render_security();
+        return;
+    }
+    if (screen == GUI_UPDATE) {
+        if (key == PICOPEN_KEY_ENTER) {
+            picopen_wifi_status_t wifi;
+            picopen_wifi_get_status(&wifi);
+            bool changed = true;
+            if (wifi.state == PICOPEN_WIFI_OFF) {
+                const bool authorized = picopen_security_authorize(
+                    &gui_state.security, PICOPEN_CAP_NETWORK_CONNECT, true);
+                changed = authorized && picopen_wifi_enable(true);
+                picopen_audit_record("wifi.enable", changed);
+            } else {
+                picopen_wifi_disable();
+                picopen_audit_record("wifi.disable", true);
+            }
+            (void)changed;
+            render_update();
+        }
         return;
     }
     if (screen == GUI_SKINS) {

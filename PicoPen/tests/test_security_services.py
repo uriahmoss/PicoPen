@@ -147,14 +147,36 @@ class SecurityServiceBaselineTests(unittest.TestCase):
         self.assertIn("PICOPEN_CAP_SYSTEM_SHUTDOWN, true", gui)
         self.assertIn("picopen_keyboard_request_shutdown(6u)", gui)
 
-    def test_wifi_update_ui_cannot_enable_networking(self):
+    def test_wifi_ui_uses_service_and_cannot_connect_or_listen(self):
         gui = (ROOT / "services" / "gui" / "gui.c").read_text(
             encoding="utf-8"
         )
-        self.assertIn("NOT CONFIGURED", gui)
-        self.assertIn("WIFI REMAINS DISABLED BY POLICY", gui)
+        wifi = (ROOT / "services" / "network" / "wifi.c").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("NO CREDENTIALS / NO ASSOCIATION", gui)
+        self.assertIn("PICOPEN_CAP_NETWORK_CONNECT, true", gui)
         self.assertNotIn("cyw43_arch_enable_sta_mode", gui)
         self.assertNotIn("cyw43_arch_wifi_connect", gui)
+        self.assertIn("locally_confirmed", wifi)
+        self.assertIn("cyw43_arch_enable_sta_mode", wifi)
+        for forbidden in ("wifi_connect", "wifi_scan", "tcp_", "udp_",
+                          "http", "password", "ssid"):
+            self.assertNotIn(forbidden, wifi.lower())
+
+    def test_wifi_starts_off_and_network_connect_requires_local_confirmation(self):
+        wifi = (ROOT / "services" / "network" / "wifi.c").read_text(
+            encoding="utf-8"
+        )
+        capability = (ROOT / "kernel" / "capability.c").read_text(
+            encoding="utf-8"
+        )
+        cmake = (ROOT / "os" / "CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertIn(".state = PICOPEN_WIFI_OFF", wifi)
+        self.assertIn("cyw43_arch_disable_sta_mode", wifi)
+        self.assertIn("PICOPEN_CAP_NETWORK_CONNECT", capability)
+        self.assertIn("pico_cyw43_arch_none", cmake)
+        self.assertNotIn("pico_cyw43_arch_lwip", cmake)
 
     def test_graphical_home_uses_bounded_direct_widgets(self):
         terminal = (ROOT / "drivers" / "terminal" / "terminal.c").read_text(

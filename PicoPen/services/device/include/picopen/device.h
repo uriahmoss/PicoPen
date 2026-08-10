@@ -14,6 +14,7 @@ typedef enum picopen_device_state {
     PICOPEN_DEVICE_READY,
     PICOPEN_DEVICE_DISABLED_POLICY,
     PICOPEN_DEVICE_UNVERIFIED,
+    PICOPEN_DEVICE_READY_LOCAL_ONLY,
 } picopen_device_state_t;
 
 typedef struct picopen_device_record {
