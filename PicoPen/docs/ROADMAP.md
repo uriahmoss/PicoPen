@@ -49,8 +49,14 @@ review gates and are never implied by acceleration.
     up an unassociated station interface
   - [x] Add local interface disable/recovery, driver result, transition count,
     audit events, and device-state reporting
-  - [ ] Add locally approved connection management without plaintext credential
-    persistence or logging
+  - [x] Add a six-result bounded passive AP inventory with SSID length bounds,
+    RSSI, channel, truncation reporting, and no probe transmission
+  - [x] Add locally approved WPA2 association with a 15-second deadline and
+    explicit disconnect
+  - [x] Keep SSID and password session-only, mask the password in the UI, scrub
+    it immediately after driver handoff, and never log it
+  - [x] Add link state/error diagnostics without linking IP, socket, listener,
+    portal, or update-install code
   - Passive access-point inventory and interface diagnostics
   - Locked online update and both locally launched portal modes
   - Bounded package streaming and shared validation interfaces

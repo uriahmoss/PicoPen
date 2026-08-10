@@ -154,15 +154,17 @@ class SecurityServiceBaselineTests(unittest.TestCase):
         wifi = (ROOT / "services" / "network" / "wifi.c").read_text(
             encoding="utf-8"
         )
-        self.assertIn("NO CREDENTIALS / NO ASSOCIATION", gui)
+        self.assertIn("VOLATILE CREDENTIALS  NO LISTENERS", gui)
         self.assertIn("PICOPEN_CAP_NETWORK_CONNECT, true", gui)
         self.assertNotIn("cyw43_arch_enable_sta_mode", gui)
         self.assertNotIn("cyw43_arch_wifi_connect", gui)
         self.assertIn("locally_confirmed", wifi)
         self.assertIn("cyw43_arch_enable_sta_mode", wifi)
-        for forbidden in ("wifi_connect", "wifi_scan", "tcp_", "udp_",
-                          "http", "password", "ssid"):
+        for forbidden in ("tcp_", "udp_", "http", "listen(", "accept("):
             self.assertNotIn(forbidden, wifi.lower())
+        self.assertIn(".scan_type = 1", wifi)
+        self.assertIn("scrub(password)", wifi)
+        self.assertIn("15000u", wifi)
 
     def test_wifi_starts_off_and_network_connect_requires_local_confirmation(self):
         wifi = (ROOT / "services" / "network" / "wifi.c").read_text(
@@ -175,7 +177,7 @@ class SecurityServiceBaselineTests(unittest.TestCase):
         self.assertIn(".state = PICOPEN_WIFI_OFF", wifi)
         self.assertIn("cyw43_arch_disable_sta_mode", wifi)
         self.assertIn("PICOPEN_CAP_NETWORK_CONNECT", capability)
-        self.assertIn("pico_cyw43_arch_none", cmake)
+        self.assertIn("pico_cyw43_arch_poll", cmake)
         self.assertNotIn("pico_cyw43_arch_lwip", cmake)
 
     def test_graphical_home_uses_bounded_direct_widgets(self):

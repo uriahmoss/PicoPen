@@ -291,6 +291,7 @@ int main(void) {
     shell_security.grants =
         (UINT64_C(1) << PICOPEN_CAP_STORAGE_READ) |
         (UINT64_C(1) << PICOPEN_CAP_NETWORK_CONNECT) |
+        (UINT64_C(1) << PICOPEN_CAP_RADIO_RECEIVE) |
         (UINT64_C(1) << PICOPEN_CAP_SYSTEM_SHUTDOWN);
 
     picopen_ipc_bus_t ipc;
@@ -363,7 +364,8 @@ int main(void) {
         if (wifi_status.state != last_wifi_state) {
             last_wifi_state = wifi_status.state;
             const picopen_device_state_t device_state =
-                wifi_status.state == PICOPEN_WIFI_READY_UNASSOCIATED
+                ((wifi_status.state != PICOPEN_WIFI_OFF) &&
+                 (wifi_status.state != PICOPEN_WIFI_ERROR))
                     ? PICOPEN_DEVICE_READY_LOCAL_ONLY
                     : (wifi_status.state == PICOPEN_WIFI_OFF
                            ? PICOPEN_DEVICE_DISABLED_POLICY

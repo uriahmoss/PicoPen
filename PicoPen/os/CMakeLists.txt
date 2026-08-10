@@ -30,7 +30,7 @@ target_link_libraries(picopen_os PRIVATE
     hardware_spi
     hardware_i2c
     hardware_resets
-    pico_cyw43_arch_none
+    pico_cyw43_arch_poll
     picopen_boot_metadata
 )
 target_include_directories(picopen_os PRIVATE
@@ -52,6 +52,7 @@ target_include_directories(picopen_os PRIVATE
     ${PROJECT_SOURCE_DIR}/third_party/fatfs
 )
 target_compile_definitions(picopen_os PRIVATE
+    CYW43_LWIP=0
     PICO_CRT0_INCLUDE_PICOBIN_ENTRY_POINT_ITEM=1
     PICO_CRT0_INCLUDE_PICOBIN_VECTOR_TABLE_ITEM=1
     PICO_STDIO_USB_CONNECTION_WITHOUT_DTR=1
