@@ -154,7 +154,9 @@ class SecurityServiceBaselineTests(unittest.TestCase):
         wifi = (ROOT / "services" / "network" / "wifi.c").read_text(
             encoding="utf-8"
         )
-        self.assertIn("VOLATILE CREDENTIALS  NO LISTENERS", gui)
+        self.assertIn("NO LISTENERS", gui)
+        self.assertIn("picopen_wifi_vault_save", gui)
+        self.assertIn("picopen_wifi_vault_load", gui)
         self.assertIn("PICOPEN_CAP_NETWORK_CONNECT, true", gui)
         self.assertNotIn("cyw43_arch_enable_sta_mode", gui)
         self.assertNotIn("cyw43_arch_wifi_connect", gui)
@@ -165,6 +167,27 @@ class SecurityServiceBaselineTests(unittest.TestCase):
         self.assertIn(".scan_type = 1", wifi)
         self.assertIn("scrub(password)", wifi)
         self.assertIn("15000u", wifi)
+
+    def test_wifi_vault_is_authenticated_bounded_and_not_unattended(self):
+        vault = (ROOT / "services" / "vault" / "wifi_vault.c").read_text(
+            encoding="utf-8"
+        )
+        storage = (ROOT / "services" / "settings" / "internal_fs.c").read_text(
+            encoding="utf-8"
+        )
+        main = (ROOT / "os" / "src" / "main.c").read_text(encoding="utf-8")
+        self.assertIn("mbedtls_gcm_auth_decrypt", vault)
+        self.assertIn("mbedtls_pkcs5_pbkdf2_hmac_ext", vault)
+        self.assertIn("pico_get_unique_board_id", vault)
+        self.assertIn("VAULT_MAX_FAILURES 5u", vault)
+        self.assertIn("VAULT_LOCK_MS 30000u", vault)
+        self.assertIn("mbedtls_platform_zeroize", vault)
+        self.assertNotRegex(vault, r"\bprintf\(")
+        self.assertIn("PICOPEN_PERSISTENT_OFFSET", storage)
+        self.assertIn("save_and_disable_interrupts", storage)
+        self.assertIn("locally_confirmed", storage)
+        self.assertIn("picopen_internal_fs_init();", main)
+        self.assertNotIn("picopen_wifi_vault_load", main)
 
     def test_wifi_starts_off_and_network_connect_requires_local_confirmation(self):
         wifi = (ROOT / "services" / "network" / "wifi.c").read_text(

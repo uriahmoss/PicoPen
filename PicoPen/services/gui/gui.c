@@ -10,18 +10,20 @@
 #include "picopen/crayon_renderer.h"
 #include "picopen/display.h"
 #include "picopen/keyboard.h"
+#include "picopen/internal_fs.h"
 #include "picopen/skin.h"
 #include "picopen/storage.h"
 #include "picopen/synthwave_renderer.h"
 #include "picopen/terminal.h"
 #include "picopen/workbench.h"
 #include "picopen/wifi.h"
+#include "picopen/wifi_vault.h"
 
 #define GUI_SCREEN_SIZE 1024u
 #define GUI_HOME_ITEMS 6u
 #define GUI_SYSTEM_ITEMS 6u
 #define GUI_SECURITY_ITEMS 3u
-#define GUI_WIFI_ITEMS 5u
+#define GUI_WIFI_ITEMS 9u
 
 #define GUI_COLOR_BACKGROUND UINT32_C(0x080020)
 #define GUI_COLOR_PANEL      UINT32_C(0x101040)
@@ -67,6 +69,9 @@ static char wifi_ssid[PICOPEN_WIFI_SSID_SIZE];
 static size_t wifi_ssid_length;
 static char wifi_password[64];
 static size_t wifi_password_length;
+static char wifi_pin[PICOPEN_VAULT_PIN_SIZE];
+static size_t wifi_pin_length;
+static picopen_vault_result_t wifi_vault_result = PICOPEN_VAULT_EMPTY;
 static char canvas[GUI_SCREEN_SIZE];
 static char canvas_title[20];
 static size_t canvas_length;
@@ -77,6 +82,11 @@ static picopen_skin_id_t rendered_page_skin;
 
 static void outline(uint16_t x, uint16_t y, uint16_t width, uint16_t height,
                     uint16_t thickness, uint32_t color);
+
+static void scrub_secret(char *value, size_t size) {
+    volatile char *cursor = value;
+    while (size-- > 0u) *cursor++ = 0;
+}
 
 static void append(const char *format, ...) {
     if (canvas_length >= sizeof(canvas) - 1u) {
@@ -593,22 +603,28 @@ static void render_update(void) {
     append("INTERFACE %-10s D%d L%d\n",
            picopen_wifi_state_name(wifi.state), wifi.driver_result,
            wifi.link_status);
-    append(selection == 0u ? "> POWER %s\n" : "  POWER %s\n",
+    append(selection == 0u ? "> STORE %s\n" : "  STORE %s\n",
+           picopen_internal_fs_state() == PICOPEN_INTERNAL_FS_READY ? "READY" : "INITIALIZE");
+    append(selection == 1u ? "> POWER %s\n" : "  POWER %s\n",
            wifi.state == PICOPEN_WIFI_OFF ? "ENABLE" : "DISABLE");
-    append(selection == 1u ? "> PASSIVE SCAN\n" : "  PASSIVE SCAN\n");
-    append(selection == 2u ? "> SSID %-24.24s\n" : "  SSID %-24.24s\n",
+    append(selection == 2u ? "> PASSIVE SCAN\n" : "  PASSIVE SCAN\n");
+    append(selection == 3u ? "> SSID %-24.24s\n" : "  SSID %-24.24s\n",
            wifi_ssid_length ? wifi_ssid : "<TYPE>");
-    append(selection == 3u ? "> PASS %.*s\n" : "  PASS %.*s\n",
+    append(selection == 4u ? "> PASS %.*s\n" : "  PASS %.*s\n",
            (int)wifi_password_length, "********************************");
-    append(selection == 4u ? "> %s\n" : "  %s\n",
+    append(selection == 5u ? "> PIN  %.*s\n" : "  PIN  %.*s\n",
+           (int)wifi_pin_length, "****************");
+    append(selection == 6u ? "> %s\n" : "  %s\n",
+           picopen_wifi_vault_present() ? "LOAD SAVED" : "REMEMBER");
+    append(selection == 7u ? "> %s\n" : "  %s\n",
            wifi.state == PICOPEN_WIFI_CONNECTED ? "DISCONNECT" : "CONNECT");
-    append("\nAPS %u%s\n", (unsigned int)wifi.ap_count,
+    append(selection == 8u ? "> FORGET SAVED\n" : "  FORGET SAVED\n");
+    append("APS %u%s", (unsigned int)wifi.ap_count,
            wifi.ap_truncated ? "+" : "");
-    for (size_t index = 0u; (index < wifi.ap_count) && (index < 3u); ++index) {
-        append("%-20.20s %ddBm C%u\n", wifi.aps[index].ssid,
-               wifi.aps[index].rssi, wifi.aps[index].channel);
-    }
-    append("\nVOLATILE CREDENTIALS  NO LISTENERS\nUPDATE INSTALL LOCKED  ESC BACK\n");
+    if (wifi.ap_count) append(" %-19.19s %ddBm", wifi.aps[0].ssid, wifi.aps[0].rssi);
+    append("\nVAULT:%s RETRY:%us  NO LISTENERS\nENTER SELECT  ESC BACK\n",
+           picopen_wifi_vault_result_name(wifi_vault_result),
+           picopen_wifi_vault_retry_seconds(time_us_64() / 1000u));
     present();
 }
 
@@ -948,15 +964,15 @@ void picopen_gui_handle_key(uint8_t key) {
         if ((key == PICOPEN_KEY_UP) && (selection > 0u)) --selection;
         else if ((key == PICOPEN_KEY_DOWN) && (selection + 1u < GUI_WIFI_ITEMS)) ++selection;
         else if (((key == 0x08u) || (key == 0x7Fu)) &&
-                 ((selection == 2u) || (selection == 3u))) {
-            char *value = selection == 2u ? wifi_ssid : wifi_password;
-            size_t *length = selection == 2u ? &wifi_ssid_length : &wifi_password_length;
+                 ((selection >= 3u) && (selection <= 5u))) {
+            char *value = selection == 3u ? wifi_ssid : selection == 4u ? wifi_password : wifi_pin;
+            size_t *length = selection == 3u ? &wifi_ssid_length : selection == 4u ? &wifi_password_length : &wifi_pin_length;
             if (*length > 0u) value[--(*length)] = '\0';
         } else if ((key >= ' ') && (key <= '~') &&
-                   ((selection == 2u) || (selection == 3u))) {
-            char *value = selection == 2u ? wifi_ssid : wifi_password;
-            size_t *length = selection == 2u ? &wifi_ssid_length : &wifi_password_length;
-            const size_t capacity = selection == 2u ? sizeof(wifi_ssid) : sizeof(wifi_password);
+                   ((selection >= 3u) && (selection <= 5u))) {
+            char *value = selection == 3u ? wifi_ssid : selection == 4u ? wifi_password : wifi_pin;
+            size_t *length = selection == 3u ? &wifi_ssid_length : selection == 4u ? &wifi_password_length : &wifi_pin_length;
+            const size_t capacity = selection == 3u ? sizeof(wifi_ssid) : selection == 4u ? sizeof(wifi_password) : sizeof(wifi_pin);
             if (*length + 1u < capacity) {
                 value[(*length)++] = (char)key;
                 value[*length] = '\0';
@@ -965,29 +981,54 @@ void picopen_gui_handle_key(uint8_t key) {
             picopen_wifi_status_t wifi;
             picopen_wifi_get_status(&wifi);
             bool changed = false;
-            if (selection == 0u && wifi.state == PICOPEN_WIFI_OFF) {
+            if (selection == 0u) {
+                changed = picopen_internal_fs_format(true);
+                picopen_audit_record("store.init", changed);
+            } else if (selection == 1u && wifi.state == PICOPEN_WIFI_OFF) {
                 const bool authorized = picopen_security_authorize(
                     &gui_state.security, PICOPEN_CAP_NETWORK_CONNECT, true);
                 changed = authorized && picopen_wifi_enable(true);
                 picopen_audit_record("wifi.enable", changed);
-            } else if (selection == 0u) {
+            } else if (selection == 1u) {
                 picopen_wifi_disable();
                 picopen_audit_record("wifi.disable", true);
-            } else if (selection == 1u) {
+            } else if (selection == 2u) {
                 const bool authorized = picopen_security_authorize(
                     &gui_state.security, PICOPEN_CAP_RADIO_RECEIVE, false);
                 changed = authorized && picopen_wifi_scan_passive(true);
                 picopen_audit_record("wifi.scan", changed);
-            } else if (selection == 4u && wifi.state == PICOPEN_WIFI_CONNECTED) {
+            } else if (selection == 6u && picopen_wifi_vault_present()) {
+                wifi_vault_result = picopen_wifi_vault_load(
+                    wifi_pin, wifi_ssid, sizeof(wifi_ssid), wifi_password,
+                    sizeof(wifi_password), time_us_64() / 1000u);
+                changed = wifi_vault_result == PICOPEN_VAULT_OK;
+                if (changed) { wifi_ssid_length = strlen(wifi_ssid); wifi_password_length = strlen(wifi_password); }
+                scrub_secret(wifi_pin, sizeof(wifi_pin)); wifi_pin_length = 0u;
+                picopen_audit_record("vault.load", changed);
+            } else if (selection == 6u) {
+                wifi_vault_result = picopen_wifi_vault_save(wifi_pin, wifi_ssid, wifi_password);
+                changed = wifi_vault_result == PICOPEN_VAULT_OK;
+                scrub_secret(wifi_pin, sizeof(wifi_pin)); wifi_pin_length = 0u;
+                picopen_audit_record("vault.save", changed);
+            } else if (selection == 7u && wifi.state == PICOPEN_WIFI_CONNECTED) {
                 changed = picopen_wifi_disconnect(true);
                 picopen_audit_record("wifi.disconnect", changed);
-            } else if (selection == 4u) {
+            } else if (selection == 7u) {
                 const bool authorized = picopen_security_authorize(
                     &gui_state.security, PICOPEN_CAP_NETWORK_CONNECT, true);
                 changed = authorized && picopen_wifi_connect(
                     wifi_ssid, wifi_password, true, time_us_64() / 1000u);
+                scrub_secret(wifi_password, sizeof(wifi_password));
                 wifi_password_length = 0u;
                 picopen_audit_record("wifi.connect", changed);
+            } else if (selection == 8u) {
+                changed = picopen_wifi_vault_forget(true);
+                scrub_secret(wifi_password, sizeof(wifi_password));
+                scrub_secret(wifi_pin, sizeof(wifi_pin));
+                wifi_password_length = 0u;
+                wifi_pin_length = 0u;
+                wifi_vault_result = PICOPEN_VAULT_EMPTY;
+                picopen_audit_record("vault.forget", changed);
             }
             (void)changed;
         }

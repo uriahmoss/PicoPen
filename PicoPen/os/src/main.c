@@ -16,6 +16,7 @@
 #include "picopen/device.h"
 #include "picopen/engagement.h"
 #include "picopen/ipc.h"
+#include "picopen/internal_fs.h"
 #include "picopen/display.h"
 #include "picopen/keyboard.h"
 #include "picopen/gui.h"
@@ -122,6 +123,7 @@ int main(void) {
     picopen_skin_init();
     picopen_workbench_init();
     picopen_engagement_session_init();
+    picopen_internal_fs_init();
     picopen_wifi_init();
 
     printf("\r\nPicoPen minimal OS\r\n");

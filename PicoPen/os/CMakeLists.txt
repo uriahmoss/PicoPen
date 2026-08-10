@@ -17,8 +17,12 @@ add_executable(picopen_os
     ../services/device/device.c
     ../services/workbench/workbench.c
     ../services/network/wifi.c
+    ../services/settings/internal_fs.c
+    ../services/vault/wifi_vault.c
     ../services/policy/engagement.c
     ../third_party/fatfs/ff.c
+    ../third_party/littlefs/lfs.c
+    ../third_party/littlefs/lfs_util.c
     src/main.c
 )
 
@@ -31,6 +35,7 @@ target_link_libraries(picopen_os PRIVATE
     hardware_i2c
     hardware_resets
     pico_cyw43_arch_poll
+    pico_mbedtls
     picopen_boot_metadata
 )
 target_include_directories(picopen_os PRIVATE
@@ -48,8 +53,11 @@ target_include_directories(picopen_os PRIVATE
     ${PROJECT_SOURCE_DIR}/services/device/include
     ${PROJECT_SOURCE_DIR}/services/workbench/include
     ${PROJECT_SOURCE_DIR}/services/network/include
+    ${PROJECT_SOURCE_DIR}/services/settings/include
+    ${PROJECT_SOURCE_DIR}/services/vault/include
     ${PROJECT_SOURCE_DIR}/services/policy/include
     ${PROJECT_SOURCE_DIR}/third_party/fatfs
+    ${PROJECT_SOURCE_DIR}/third_party/littlefs
 )
 target_compile_definitions(picopen_os PRIVATE
     CYW43_LWIP=0

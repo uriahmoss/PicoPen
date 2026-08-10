@@ -264,7 +264,15 @@ power interruptions without corrupting its boot metadata.
   - [ ] Add a service-level operation deadline after the timer contract is
     connected to the block transport
 - [ ] **Slice 3D:** Add pinned littlefs for internal settings and audit journals
-  - Keep secrets in a separately designed encrypted vault
+  - [x] Pin and integrate littlefs v2.11.3 over the bounded 192 KiB persistent
+    region with explicit local first-use initialization
+  - [x] Add the reviewed Wi-Fi vault v1: AES-256-GCM, PIN/board-associated
+    PBKDF2-HMAC-SHA-256 key derivation, atomic replace, explicit forget, secret
+    scrubbing, and bounded retry lockout
+    - Hardware evidence: local initialization, encrypted save, reboot-locked
+      load, masked credential handling, and explicit forget operated as
+      expected on the PicoCalc/Pico 2 W test unit.
+  - [ ] Persist non-secret settings and authenticated audit journals
   - Test interrupted updates and full-media behavior
 - [ ] Work queues, timers, IPC, and capability checks
   - [x] Add a fixed-capacity deadline queue with per-loop execution budgets
@@ -383,8 +391,8 @@ power interruptions without corrupting its boot metadata.
   - [x] Keep Wi-Fi and the CYW43 driver uninitialized until locally enabled
   - [x] Bring up only an unassociated diagnostic interface with no scan,
     credentials, network stack, sockets, or listeners in the first slice
-  - Add saved-network selection without plaintext credentials or logs
-  - Add passive access-point, signal, channel, and interface status views
+  - [x] Add saved-network selection without plaintext credentials or logs
+  - [x] Add passive access-point, signal, channel, and interface status views
   - Separate connection, passive observation, and active probing capabilities
 - [ ] Secure Wi-Fi software update
   - [ ] Approve the production signature and key-rotation policy

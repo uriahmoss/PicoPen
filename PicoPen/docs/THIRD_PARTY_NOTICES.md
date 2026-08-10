@@ -34,9 +34,14 @@ listed separately and is not a PicoPen dependency.
 - The firmware build uses the checked-in generated bitmap header and does not
   require a host font engine.
 
+## Incorporated
+
+- littlefs v2.11.3 (`6cb4e86540eca0d9ba62500a298385c9d863c8be`):
+  internal settings and encrypted vault storage; BSD 3-Clause. License retained
+  at `third_party/littlefs/LICENSE.md`.
+
 ## Approved for future integration
 
-- littlefs: internal settings and audit journal; BSD 3-Clause
 - LVGL: graphical interface toolkit; MIT
 
 Each component moves to Incorporated only in the slice that vendors or links

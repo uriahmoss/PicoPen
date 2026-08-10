@@ -34,9 +34,11 @@
 - Never store secrets in plaintext audit records.
 - Deny sensitive operations when capability, scope, clock validity, audit
   availability, or required physical confirmation cannot be established.
-- Keep credentials and signing keys out of removable storage by default;
-  encrypt stored secrets with a device-bound design selected before the vault
-  is implemented.
+- Keep credentials and signing keys out of removable storage by default.
+  Wi-Fi vault v1 uses authenticated encryption with a PIN-derived key associated
+  with the unique board identifier; the identifier is not a hardware secret,
+  so offline resistance continues to depend on PIN entropy. See
+  `PERSISTENT_STORAGE.md`.
 - Authenticate remote-control sessions, bind each request to an expiring
   session and engagement profile, reject replays, and retain a local emergency
   stop that remote software cannot override.

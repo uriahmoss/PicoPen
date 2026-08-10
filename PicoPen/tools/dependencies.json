@@ -27,9 +27,9 @@
     },
     {
       "name": "littlefs",
-      "status": "approved",
+      "status": "incorporated",
       "source": "https://github.com/littlefs-project/littlefs.git",
-      "pin": "pending",
+      "pin": "6cb4e86540eca0d9ba62500a298385c9d863c8be",
       "license": "BSD-3-Clause",
       "purpose": "Internal settings and audit journal"
     },
