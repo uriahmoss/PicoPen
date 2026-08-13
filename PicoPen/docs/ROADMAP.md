@@ -406,9 +406,12 @@ power interruptions without corrupting its boot metadata.
     credentials, network stack, sockets, or listeners in the first slice
   - [x] Add saved-network selection without plaintext credentials or logs
   - [x] Add passive access-point, signal, channel, and interface status views
-  - [x] Add DHCP, IPv4, gateway, DNS, RSSI, and lease diagnostics with TCP,
-    sockets, and listeners disabled
+  - [x] Add DHCP, IPv4, gateway, DNS, RSSI, and lease diagnostics with sockets,
+    netconn APIs, and listeners disabled
   - [x] Add direct selection from the bounded passive scan inventory
+  - [x] Add exact-target/CIDR and port-range engagement scope constraints
+  - [x] Add locally confirmed, single-request DNS, ICMP, and TCP diagnostics
+    with rate limiting, cancellation, deadline, audit, and live scope checks
   - Separate connection, passive observation, and active probing capabilities
 - [ ] Secure Wi-Fi software update
   - [ ] Approve the production signature and key-rotation policy
@@ -439,7 +442,9 @@ power interruptions without corrupting its boot metadata.
   - [ ] Require separate local approval before download, staging, and reboot
   - [ ] Record sanitized update status and audit references without secrets
   - [ ] Let the bootloader independently validate and roll back failed boots
-- [ ] Scoped TCP service identification
+- [x] Scoped TCP connection/service identification baseline
+- [x] Read-only evidence baseline with bounded SHA-256, printable-string count,
+  and PCAP/PCAPNG packet inventory
 - [ ] HTTP and TLS inspection
 - [ ] SSH client
 - [ ] BLE inventory

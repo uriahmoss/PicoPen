@@ -75,6 +75,7 @@ unrestricted developer path.
 A scope profile may name:
 
 - permitted IP addresses and network ranges
+- permitted hostnames and TCP/UDP port ranges
 - permitted device identifiers
 - permitted attachment capabilities
 - permitted radio region and bands
@@ -84,6 +85,11 @@ A scope profile may name:
 Scope checks are enforced by shared services rather than duplicated in each
 application. Low-level developer builds remain visibly marked and must not be
 represented as enforcing production policy.
+
+Active recon is deliberately single-target and single-request. It has no range
+scanner, listener, stealth mode, payload delivery, credential use, or exploit
+path. The service revalidates scope while a job is running and cancels work when
+the scope expires or is revoked.
 
 ## Out of scope for version 1
 

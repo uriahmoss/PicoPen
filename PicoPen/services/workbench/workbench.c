@@ -78,6 +78,18 @@ bool picopen_workbench_cancel(void) {
     return true;
 }
 
+bool picopen_workbench_dismiss(void) {
+    if ((current.state == PICOPEN_WORKBENCH_IDLE) ||
+        (current.state == PICOPEN_WORKBENCH_RUNNING)) {
+        return false;
+    }
+    current = (picopen_workbench_snapshot_t){
+        .abi_version = PICOPEN_WORKBENCH_ABI_VERSION,
+        .state = PICOPEN_WORKBENCH_IDLE,
+    };
+    return true;
+}
+
 bool picopen_workbench_poll(uint64_t now_ms) {
     if ((current.state != PICOPEN_WORKBENCH_RUNNING) ||
         (now_ms < next_step_ms)) {

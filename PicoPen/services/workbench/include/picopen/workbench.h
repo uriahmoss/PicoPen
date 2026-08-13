@@ -45,6 +45,7 @@ void picopen_workbench_init(void);
 bool picopen_workbench_start(const picopen_device_manager_t *devices,
                              uint64_t now_ms);
 bool picopen_workbench_cancel(void);
+bool picopen_workbench_dismiss(void);
 bool picopen_workbench_poll(uint64_t now_ms);
 void picopen_workbench_snapshot(picopen_workbench_snapshot_t *snapshot);
 const char *picopen_workbench_job_state_name(

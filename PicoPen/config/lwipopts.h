@@ -4,7 +4,8 @@
 #define NO_SYS 1
 #define LWIP_SOCKET 0
 #define LWIP_NETCONN 0
-#define LWIP_TCP 0
+#define LWIP_TCP 1
+#define LWIP_RAW 1
 #define LWIP_UDP 1
 #define LWIP_DHCP 1
 #define LWIP_DNS 1
@@ -16,6 +17,11 @@
 #define MEM_ALIGNMENT 4
 #define MEM_SIZE 8192
 #define MEMP_NUM_UDP_PCB 2
+#define MEMP_NUM_TCP_PCB 2
+#define MEMP_NUM_RAW_PCB 1
+#define TCP_MSS 536
+#define TCP_WND (2 * TCP_MSS)
+#define TCP_SND_BUF (2 * TCP_MSS)
 #define MEMP_NUM_SYS_TIMEOUT 8
 #define LWIP_STATS 0
 #define LWIP_PROVIDE_ERRNO 1

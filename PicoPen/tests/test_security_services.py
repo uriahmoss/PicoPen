@@ -202,7 +202,14 @@ class SecurityServiceBaselineTests(unittest.TestCase):
         self.assertIn("PICOPEN_CAP_NETWORK_CONNECT", capability)
         self.assertIn("pico_cyw43_arch_lwip_poll", cmake)
         self.assertIn("LWIP_SOCKET 0", (ROOT / "config" / "lwipopts.h").read_text(encoding="utf-8"))
-        self.assertIn("LWIP_TCP 0", (ROOT / "config" / "lwipopts.h").read_text(encoding="utf-8"))
+        lwip = (ROOT / "config" / "lwipopts.h").read_text(encoding="utf-8")
+        recon = (ROOT / "services" / "recon" / "recon.c").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("LWIP_TCP 1", lwip)
+        self.assertIn("LWIP_NETCONN 0", lwip)
+        for listener_api in ("tcp_bind(", "tcp_listen(", "tcp_accept("):
+            self.assertNotIn(listener_api, recon)
 
     def test_network_preferences_and_recovery_fast_track(self):
         wifi = (ROOT / "services" / "network" / "wifi.c").read_text(encoding="utf-8")

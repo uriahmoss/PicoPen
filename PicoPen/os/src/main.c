@@ -19,6 +19,8 @@
 #include "picopen/internal_fs.h"
 #include "picopen/preferences.h"
 #include "picopen/recovery.h"
+#include "picopen/recon.h"
+#include "picopen/evidence.h"
 #include "picopen/display.h"
 #include "picopen/keyboard.h"
 #include "picopen/gui.h"
@@ -133,6 +135,8 @@ int main(void) {
     picopen_preferences_get(&preferences);
     (void)picopen_skin_select((picopen_skin_id_t)preferences.skin);
     picopen_wifi_init();
+    picopen_recon_init();
+    picopen_evidence_init();
 
     printf("\r\nPicoPen minimal OS\r\n");
     printf("version: %s\r\n", PICOPEN_VERSION);
@@ -301,6 +305,7 @@ int main(void) {
     shell_security.grants =
         (UINT64_C(1) << PICOPEN_CAP_STORAGE_READ) |
         (UINT64_C(1) << PICOPEN_CAP_NETWORK_CONNECT) |
+        (UINT64_C(1) << PICOPEN_CAP_NETWORK_PROBE) |
         (UINT64_C(1) << PICOPEN_CAP_RADIO_RECEIVE) |
         (UINT64_C(1) << PICOPEN_CAP_SYSTEM_SHUTDOWN);
 
@@ -356,6 +361,7 @@ int main(void) {
     (void)picopen_work_schedule(&work_queue, time_us_64() / 1000u, heartbeat,
                                 &heartbeat_context);
 
+    uint64_t next_evidence_ui_ms = 0u;
     uint64_t next_device_health_ms =
         time_us_64() / 1000u + PICOPEN_DEVICE_HEALTH_MS;
     picopen_wifi_state_t last_wifi_state = PICOPEN_WIFI_OFF;
@@ -440,6 +446,19 @@ int main(void) {
                 picopen_audit_record("workbench.error", false);
             }
             picopen_gui_refresh_workbench();
+        }
+        if(picopen_recon_poll(now_ms)){
+            picopen_recon_snapshot_t snapshot;picopen_recon_snapshot(&snapshot);
+            picopen_audit_record(snapshot.state==PICOPEN_RECON_COMPLETE?"recon.done":"recon.failed",snapshot.state==PICOPEN_RECON_COMPLETE);
+            picopen_gui_refresh_workbench();
+        }
+        if(picopen_evidence_poll()){
+            picopen_evidence_snapshot_t snapshot;picopen_evidence_snapshot(&snapshot);
+            if(snapshot.state==PICOPEN_EVIDENCE_COMPLETE||snapshot.state==PICOPEN_EVIDENCE_ERROR){picopen_audit_record(snapshot.state==PICOPEN_EVIDENCE_COMPLETE?"evidence.done":"evidence.error",snapshot.state==PICOPEN_EVIDENCE_COMPLETE);}
+            if(now_ms>=next_evidence_ui_ms||snapshot.state==PICOPEN_EVIDENCE_COMPLETE||snapshot.state==PICOPEN_EVIDENCE_ERROR){
+                picopen_gui_refresh_workbench();
+                next_evidence_ui_ms=now_ms+250u;
+            }
         }
         if (now_ms >= next_device_health_ms) {
             bool state_changed = false;

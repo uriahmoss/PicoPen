@@ -80,10 +80,12 @@ Long-lived services manage the terminal, storage, networking, attachments,
 engagement scope, secrets, and audit records.
 
 The networking service owns CYW43 and lwIP polling, association deadlines,
-DHCP state, and sanitized local diagnostics. The baseline compiles out TCP,
-sockets, and netconn APIs; adding a listener requires a separately reviewed
-service contract and explicit local activation. Passive scan selection and IP
-diagnostics do not grant probing or remote-control capabilities.
+DHCP state, and sanitized local diagnostics. Sockets, netconn APIs, and TCP
+listeners remain disabled. A narrow raw-lwIP recon service can issue one
+locally confirmed DNS lookup, ICMP echo, or TCP connection at a time, with an
+exact target and port scope, rate limit, deadline, cancellation, and scope
+revalidation. Passive scan selection and IP diagnostics do not grant probing
+or remote-control capabilities.
 
 The internal settings service owns the reserved littlefs region. Non-secret
 preferences are versioned and checksummed, secrets use the separately
