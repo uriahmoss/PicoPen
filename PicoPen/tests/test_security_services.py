@@ -76,9 +76,10 @@ class SecurityServiceBaselineTests(unittest.TestCase):
                           "hardware/spi.h", "gpio_put(", "i2c_write",
                           "spi_write"):
             self.assertNotIn(forbidden, implementation)
-        self.assertIn("CONFIG/POLICY INVENTORY ONLY", gui)
-        self.assertIn("NO BUS TRAFFIC OR PIN CHANGES", gui)
-        self.assertIn('picopen_audit_record("workbench.start"', gui)
+        apps_handler = gui[gui.index("if (screen == GUI_APPS) {"):
+                           gui.index("if(screen==GUI_APP_CONFIG)")]
+        self.assertNotIn("picopen_workbench_start", apps_handler)
+        self.assertIn("PICOPEN_APP_DEVICE_INVENTORY", apps_handler)
 
     def test_engagement_editor_is_bounded_local_and_does_not_grant_capabilities(self):
         header = (ROOT / "services" / "policy" / "include" / "picopen" /
@@ -219,7 +220,7 @@ class SecurityServiceBaselineTests(unittest.TestCase):
         self.assertIn("netif_default", wifi)
         self.assertIn("dns_getserver", wifi)
         self.assertIn("picopen_wifi_select_ap", gui)
-        self.assertIn("PREFERENCES_VERSION 1u", preferences)
+        self.assertIn("PREFERENCES_VERSION 2u", preferences)
         self.assertIn("offsetof(picopen_preferences_t, checksum)", preferences)
         self.assertIn("PICOPEN_BOOT_ATTEMPT_OS_ENTERED", recovery)
         self.assertIn("PICOPEN_GUI_STORAGE_SAFE_REMOVE", gui)

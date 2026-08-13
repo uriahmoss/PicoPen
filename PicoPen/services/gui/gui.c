@@ -7,6 +7,7 @@
 #include "pico/stdlib.h"
 
 #include "picopen/audit.h"
+#include "picopen/apps.h"
 #include "picopen/crayon_renderer.h"
 #include "picopen/display.h"
 #include "picopen/keyboard.h"
@@ -28,7 +29,7 @@
 #define GUI_SYSTEM_ITEMS 7u
 #define GUI_SECURITY_ITEMS 5u
 #define GUI_WIFI_ITEMS 9u
-#define GUI_WORKBENCH_ITEMS 5u
+#define GUI_APPS_VISIBLE_ITEMS 9u
 
 #define GUI_COLOR_BACKGROUND UINT32_C(0x080020)
 #define GUI_COLOR_PANEL      UINT32_C(0x101040)
@@ -47,8 +48,13 @@ typedef enum gui_screen {
     GUI_FILES,
     GUI_FILE_VIEW,
     GUI_DEVICES,
-    GUI_WORKBENCH,
+    GUI_APPS,
+    GUI_APP_DEVICES,
+    GUI_APP_CONFIG,
+    GUI_RECON_CONFIRM,
     GUI_RECON,
+    GUI_RECON_HISTORY,
+    GUI_EVIDENCE_PICKER,
     GUI_EVIDENCE,
     GUI_AUDIT,
     GUI_SYSTEM,
@@ -68,6 +74,16 @@ static size_t selection;
 static size_t home_selection;
 static size_t system_selection;
 static size_t workbench_selection;
+static size_t security_selection;
+static size_t wifi_selection;
+static size_t pending_recon_selection;
+static picopen_app_catalog_t app_catalog;
+static char task_target[PICOPEN_RECON_TARGET_SIZE];
+static size_t task_target_length;
+static uint16_t task_port = 80u;
+static size_t task_field;
+static char task_error[48];
+static picopen_security_mode_t security_mode;
 static size_t files_selection;
 static picopen_storage_listing_t file_listing;
 static char file_path[PICOPEN_STORAGE_PATH_SIZE];
@@ -76,7 +92,6 @@ static size_t engagement_reference_length;
 static size_t engagement_duration_index;
 static char engagement_target[PICOPEN_ENGAGEMENT_TARGET_SIZE];
 static size_t engagement_target_length;
-static size_t engagement_port_index;
 static char wifi_ssid[PICOPEN_WIFI_SSID_SIZE];
 static size_t wifi_ssid_length;
 static char wifi_password[64];
@@ -348,7 +363,7 @@ static void graphical_tile(size_t index, const char *label, uint16_t x,
 
 static void render_home(void) {
     static const char *const labels[GUI_HOME_ITEMS] = {
-        "STATUS", "FILES", "DEVICES", "WORKBENCH", "AUDIT", "SYSTEM",
+        "STATUS", "FILES", "DEVICES", "APPS", "AUDIT", "SYSTEM",
     };
     const bool scope_active = picopen_engagement_session_active(
         time_us_64() / 1000u);
@@ -403,7 +418,7 @@ static void render_home(void) {
 
 static void redraw_home_focus(size_t previous, size_t current) {
     static const char *const labels[GUI_HOME_ITEMS] = {
-        "STATUS", "FILES", "DEVICES", "WORKBENCH", "AUDIT", "SYSTEM",
+        "STATUS", "FILES", "DEVICES", "APPS", "AUDIT", "SYSTEM",
     };
     if (picopen_skin_current_id() == PICOPEN_SKIN_CRAYON) {
         picopen_crayon_renderer_home_focus(labels, previous, current);
@@ -527,38 +542,126 @@ static void render_devices(void) {
 }
 
 static void render_workbench(void) {
-    begin("WORKBENCH");
-    picopen_workbench_snapshot_t snapshot;
-    picopen_workbench_snapshot(&snapshot);
-    if (snapshot.state==PICOPEN_WORKBENCH_RUNNING || snapshot.item_count>0u) {
-        append("JOB %-9s  %3u%%\n", picopen_workbench_job_state_name(snapshot.state),snapshot.progress_percent);
-        for(size_t index=0u;index<snapshot.item_count;++index) append("%-12s %s\n",snapshot.items[index].name,picopen_workbench_item_state_name(snapshot.items[index].state));
-        append("\nESC CANCEL/BACK\n"); present(); return;
+    begin("APPS");
+    append("MODE %s  BOUNDARY %s\n\n",
+        security_mode==PICOPEN_SECURITY_OWNER?"OWNER":security_mode==PICOPEN_SECURITY_GUARDED?"GUARDED":"DEVELOPER",
+        picopen_engagement_session_active(time_us_64()/1000u)?"ACTIVE":"OPTIONAL");
+    const size_t shown=app_catalog.count<GUI_APPS_VISIBLE_ITEMS?app_catalog.count:GUI_APPS_VISIBLE_ITEMS;
+    for(size_t index=0u;index<shown;++index){
+        const picopen_app_descriptor_t *app=&app_catalog.apps[index];
+        append(selection==index?"> %-22.22s%s\n":"  %-22.22s%s\n",app->name,
+               app->built_in?"":" SD");
     }
-    static const char *const items[]={"DEVICE INVENTORY","DNS LOOKUP","ICMP ECHO","TCP IDENTIFY","EVIDENCE FILE"};
-    append("SCOPE %s\n\n",picopen_engagement_session_active(time_us_64()/1000u)?"ACTIVE":"REQUIRED");
-    for(size_t index=0u;index<GUI_WORKBENCH_ITEMS;++index) append(selection==index?"> %s\n":"  %s\n",items[index]);
-    append("\nCONFIG/POLICY INVENTORY ONLY\nNO BUS TRAFFIC OR PIN CHANGES\nACTIVE NETWORK JOBS REQUIRE ENTER\nUP/DOWN ENTER SELECT ESC BACK\n");
+    append("\nENTER OPEN  ESC BACK\nSD APPS: /PicoPen/apps\n");
+    present();
+}
+
+static picopen_recon_kind_t recon_kind_for_selection(size_t index) {
+    const picopen_app_kind_t kind=app_catalog.apps[index].kind;
+    if(kind==PICOPEN_APP_HTTP_INSPECTOR)return PICOPEN_RECON_HTTP_HEAD;
+    if(kind==PICOPEN_APP_SSH_BANNER)return PICOPEN_RECON_SSH_BANNER;
+    if(kind==PICOPEN_APP_TLS_INSPECTOR)return PICOPEN_RECON_TLS_METADATA;
+    return PICOPEN_RECON_TCP;
+}
+
+static void render_app_config(void){
+    const picopen_app_descriptor_t *app=&app_catalog.apps[pending_recon_selection];
+    begin("APP TASK");
+    if(app->kind==PICOPEN_APP_NETWORK_DISCOVERY){
+        picopen_wifi_status_t wifi;picopen_wifi_get_status(&wifi);
+        append("\nNETWORK DISCOVERY\nPASSIVE LOCAL VIEW\n\nIP %s\nGATEWAY %s\nDNS %s\nAPS OBSERVED %u%s\n\nACTIVE DISCOVERY NOT YET ENABLED\nESC BACK\n",
+            wifi.ipv4[0]?wifi.ipv4:"-",wifi.gateway[0]?wifi.gateway:"-",
+            wifi.dns[0]?wifi.dns:"-",(unsigned)wifi.ap_count,wifi.ap_truncated?"+":"");
+        present();return;
+    }
+    if(app->kind==PICOPEN_APP_SESSION_REPORTS){
+        append("\nSESSION REPORTS\n\nRESULTS %u\nAUDIT RECORDS %u\nBOUNDARY %s\n\nEXPORT UNAVAILABLE: SD IS READ-ONLY\nSESSION REMAINS IN MEMORY\nESC BACK\n",
+            (unsigned)picopen_recon_history_count(),(unsigned)picopen_audit_count(),
+            picopen_engagement_session_active(time_us_64()/1000u)?"ACTIVE":"INACTIVE");
+        present();return;
+    }
+    if(app->kind==PICOPEN_APP_SD_PACKAGE){
+        append("\n%.23s\n\nPACKAGE DISCOVERED ON SD\nRUNTIME/MANIFEST VALIDATOR PENDING\nNOT EXECUTED\n\nESC BACK\n",app->name);
+        present();return;
+    }
+    append("\n%s\n\n",app->name);
+    append(task_field==0u?"> TARGET %.28s\n":"  TARGET %.28s\n",task_target_length?task_target:"<REQUIRED>");
+    append(task_field==1u?"> PORT %u\n":"  PORT %u\n",task_port);
+    if (task_error[0]) append("\n%s\n", task_error);
+    append("\nLEFT/RIGHT PORT  ENTER CONTINUE\nESC BACK\n");present();
+}
+
+static void render_recon_confirm(void) {
+    picopen_engagement_t scope;
+    picopen_engagement_session_snapshot(&scope);
+    const picopen_recon_kind_t kind = recon_kind_for_selection(
+        pending_recon_selection);
+    begin("CONFIRM ACTION");
+    append("\nOP       %s\nTARGET   %.30s\nPORT     %u\nLIMIT    %.28s\nSESSION  %s\n\n",
+           picopen_recon_kind_name(kind), task_target, task_port,
+           scope.boundary_configured ? scope.target : "ANY TASK TARGET",
+           picopen_engagement_session_active(time_us_64() / 1000u)
+               ? "ACTIVE" : "INACTIVE");
+    append("ONE REQUEST, 7 SECOND DEADLINE\nNO CREDENTIALS OR EXPLOIT PAYLOAD\n\nENTER CONFIRM  ESC CANCEL\n");
+    present();
+}
+
+static void render_recon_history(void) {
+    begin("RECENT RESULTS");
+    const size_t count = picopen_recon_history_count();
+    if (count == 0u) append("\nNO NETWORK RESULTS THIS BOOT\n");
+    for (size_t index = 0u; index < count; ++index) {
+        picopen_recon_snapshot_t entry;
+        if (picopen_recon_history_get(index, &entry)) {
+            append("%-9s %-10s %.14s:%u\n",
+                   picopen_recon_kind_name(entry.kind),
+                   picopen_recon_state_name(entry.state), entry.target,
+                   entry.port);
+        }
+    }
+    append("\nVOLATILE / SANITIZED\nESC BACK\n");
+    present();
+}
+
+static void render_evidence_picker(void) {
+    begin("EVIDENCE PICKER");
+    if (!gui_state.storage_ready || file_listing.count == 0u) {
+        append("\nNO FILES AVAILABLE\nUSE FILES OR RESCAN SD\n\nESC BACK\n");
+        present();
+        return;
+    }
+    append("%.26s  READ-ONLY\n\n", file_path);
+    for (size_t index = 0u; index < file_listing.count; ++index) {
+        const picopen_storage_entry_t *entry = &file_listing.entries[index];
+        append(selection == index ? "> %-23.23s%s\n" : "  %-23.23s%s\n",
+               entry->name, entry->directory ? "/" : "");
+    }
+    append("\nENTER ANALYZE  ESC BACK\n");
     present();
 }
 
 static void render_recon(void) {
     begin("NETWORK RECON"); picopen_recon_snapshot_t snapshot; picopen_recon_snapshot(&snapshot);
-    append("\nOP %s\nSTATE %s\nTARGET %.30s\nADDRESS %s\nPORT %u\nELAPSED %lu MS\nRESULT %d\n",
-        snapshot.kind==PICOPEN_RECON_DNS?"DNS":snapshot.kind==PICOPEN_RECON_ICMP?"ICMP":"TCP",
+    append("\nOP %s\nSTATE %s\nTARGET %.30s\nADDRESS %s\nPORT %u  SERVICE %s\nELAPSED %lu MS  RX %lu\nDETAIL %.80s\nRESULT %d\n",
+        picopen_recon_kind_name(snapshot.kind),
         picopen_recon_state_name(snapshot.state),snapshot.target,
-        snapshot.address[0]?snapshot.address:"-",snapshot.port,
-        (unsigned long)snapshot.elapsed_ms,snapshot.result);
+        snapshot.address[0]?snapshot.address:"-",snapshot.port,snapshot.service,
+        (unsigned long)snapshot.elapsed_ms,(unsigned long)snapshot.bytes_received,
+        snapshot.detail[0]?snapshot.detail:"-",snapshot.result);
     append("\nONE REQUEST RATE LIMITED\nESC CANCEL/BACK\n");present();
 }
 
 static void render_evidence(void){
     begin("EVIDENCE");picopen_evidence_snapshot_t snapshot;picopen_evidence_snapshot(&snapshot);
-    append("\nSTATE %s\nFILE %.30s\nSIZE %lu  PROCESSED %lu\nSHA256\n%.32s\n%.32s\nSTRINGS %lu\nCAPTURE %s  PACKETS %lu\nRESULT %d\n",
+    append("\nSTATE %s\nFILE %.30s\nSIZE %lu  PROCESSED %lu\nSHA256\n%.32s\n%.32s\nSTRINGS %lu  %.38s\nCAPTURE %s  PACKETS %lu\nIP4:%lu IP6:%lu ARP:%lu\nTCP:%lu UDP:%lu ICMP:%lu\nRESULT %d\n",
         picopen_evidence_state_name(snapshot.state),snapshot.path,(unsigned long)snapshot.size,
         (unsigned long)snapshot.processed,snapshot.sha256,&snapshot.sha256[32],
-        (unsigned long)snapshot.string_count,snapshot.capture==PICOPEN_CAPTURE_PCAP?"PCAP":snapshot.capture==PICOPEN_CAPTURE_PCAPNG?"PCAPNG":"NONE",
-        (unsigned long)snapshot.packet_count,snapshot.result);
+        (unsigned long)snapshot.string_count,snapshot.string_preview,
+        snapshot.capture==PICOPEN_CAPTURE_PCAP?"PCAP":snapshot.capture==PICOPEN_CAPTURE_PCAPNG?"PCAPNG":"NONE",
+        (unsigned long)snapshot.packet_count,(unsigned long)snapshot.ipv4_count,
+        (unsigned long)snapshot.ipv6_count,(unsigned long)snapshot.arp_count,
+        (unsigned long)snapshot.tcp_count,(unsigned long)snapshot.udp_count,
+        (unsigned long)snapshot.icmp_count,snapshot.result);
     append("\nREAD ONLY  MAX 256 KIB\nESC CANCEL/BACK\n");present();
 }
 
@@ -627,24 +730,25 @@ static void render_security(void) {
     const uint64_t now_ms = time_us_64() / 1000u;
     const bool active = picopen_engagement_is_active(&engagement, now_ms);
     static const uint16_t durations_minutes[] = {15u, 60u, 240u};
-    static const char *const port_names[] = {"22", "80", "443", "1-1024"};
-    append("SCOPE %s  SESSION ONLY\n\n", active ? "ACTIVE" : "INACTIVE");
+    append("BOUNDARY %s  MODE %s\n\n", active ? "ACTIVE" : "OPTIONAL",
+        security_mode==PICOPEN_SECURITY_OWNER?"OWNER":security_mode==PICOPEN_SECURITY_GUARDED?"GUARDED":"DEVELOPER");
     append(selection == 0u ? "> REF %-20s\n" : "  REF %-20s\n",
            engagement_reference_length == 0u ? "<TYPE REFERENCE>"
                                              : engagement_reference);
-    append(selection == 1u ? "> TARGET %-20.20s\n" : "  TARGET %-20.20s\n",
-           engagement_target_length == 0u ? "<IP/CIDR/HOST>" : engagement_target);
-    append(selection == 2u ? "> PORTS %s\n" : "  PORTS %s\n",
-           port_names[engagement_port_index]);
-    append(selection == 3u ? "> DURATION %u MIN\n" : "  DURATION %u MIN\n",
+    append(selection == 1u ? "> LIMIT %-20.20s\n" : "  LIMIT %-20.20s\n",
+           engagement_target_length == 0u ? "<OPTIONAL>" : engagement_target);
+    append(selection == 2u ? "> DURATION %u MIN\n" : "  DURATION %u MIN\n",
            durations_minutes[engagement_duration_index]);
-    append(selection == 4u ? "> %s\n" : "  %s\n",
+    append(selection == 3u ? "> %s\n" : "  %s\n",
            active ? "END SCOPE" : "ACTIVATE SCOPE");
+    append(selection == 4u ? "> MODE %s\n" : "  MODE %s\n",
+        security_mode==PICOPEN_SECURITY_OWNER?"OWNER":security_mode==PICOPEN_SECURITY_GUARDED?"GUARDED":"DEVELOPER");
     if (active) {
-        append("\nREF %s\nREMAINING %llu MIN\n", engagement.reference,
+        append("\nREF %s\nLIMIT %s\nREMAINING %llu MIN\n", engagement.reference,
+               engagement.boundary_configured ? engagement.target : "NONE",
                (engagement.expires_ms - now_ms + 59999u) / 60000u);
     }
-    append("\nSCOPE DOES NOT GRANT CAPABILITIES\nTARGET LIMITS ACTIVE REQUESTS\nUP/DOWN FIELD LEFT/RIGHT OPTION\nENTER SELECT ESC BACK\n");
+    append("\nSCOPE DOES NOT GRANT CAPABILITIES\nPORTS ARE CHOSEN INSIDE APPS\nOWNER MODE MINIMIZES PROMPTS\n");
     present();
 }
 
@@ -725,8 +829,13 @@ static void render(void) {
         case GUI_FILES: render_files(); break;
         case GUI_FILE_VIEW: render_file(); break;
         case GUI_DEVICES: render_devices(); break;
-        case GUI_WORKBENCH: render_workbench(); break;
+        case GUI_APPS: render_workbench(); break;
+        case GUI_APP_DEVICES: render_devices(); break;
+        case GUI_APP_CONFIG: render_app_config(); break;
+        case GUI_RECON_CONFIRM: render_recon_confirm(); break;
         case GUI_RECON: render_recon(); break;
+        case GUI_RECON_HISTORY: render_recon_history(); break;
+        case GUI_EVIDENCE_PICKER: render_evidence_picker(); break;
         case GUI_EVIDENCE: render_evidence(); break;
         case GUI_AUDIT: render_audit(); break;
         case GUI_SYSTEM: render_system(); break;
@@ -743,7 +852,7 @@ static void render(void) {
 
 static void open_home_item(void) {
     static const gui_screen_t screens[GUI_HOME_ITEMS] = {
-        GUI_STATUS, GUI_FILES, GUI_DEVICES, GUI_WORKBENCH, GUI_AUDIT, GUI_SYSTEM,
+        GUI_STATUS, GUI_FILES, GUI_DEVICES, GUI_APPS, GUI_AUDIT, GUI_SYSTEM,
     };
     home_selection = selection;
     (void)picopen_preferences_set_menu(home_selection, system_selection,
@@ -753,6 +862,8 @@ static void open_home_item(void) {
         selection = system_selection;
     } else if (screen == GUI_FILES) {
         selection = files_selection < file_listing.count ? files_selection : 0u;
+    } else if (screen == GUI_APPS) {
+        selection = workbench_selection;
     } else {
         selection = 0u;
     }
@@ -768,7 +879,10 @@ static void open_system_item(void) {
     (void)picopen_preferences_set_menu(home_selection, system_selection,
                                        files_selection);
     screen = screens[selection];
-    selection = screen == GUI_SKINS ? (size_t)picopen_skin_current_id() : 0u;
+    if (screen == GUI_SKINS) selection = (size_t)picopen_skin_current_id();
+    else if (screen == GUI_SECURITY) selection = security_selection;
+    else if (screen == GUI_UPDATE) selection = wifi_selection;
+    else selection = 0u;
     if (screen == GUI_TERMINAL) {
         rendered_page_valid = false;
         picopen_terminal_init();
@@ -784,7 +898,9 @@ static gui_screen_t parent_screen(gui_screen_t current) {
     if (current == GUI_FILE_VIEW) {
         return GUI_FILES;
     }
-    if(current==GUI_RECON||current==GUI_EVIDENCE)return GUI_WORKBENCH;
+    if(current==GUI_APP_DEVICES||current==GUI_APP_CONFIG||current==GUI_RECON_CONFIRM||current==GUI_RECON||
+       current==GUI_RECON_HISTORY||current==GUI_EVIDENCE_PICKER||
+       current==GUI_EVIDENCE)return GUI_APPS;
     if ((current == GUI_SECURITY) || (current == GUI_UPDATE) ||
         (current == GUI_SKINS) || (current == GUI_ABOUT) ||
         (current == GUI_RECOVERY) ||
@@ -803,6 +919,10 @@ void picopen_gui_init(const picopen_shell_state_t *state) {
     strcpy(file_path, "/");
     picopen_preferences_t preferences;
     picopen_preferences_get(&preferences);
+    security_mode=(picopen_security_mode_t)preferences.security_mode;
+    picopen_apps_init();
+    picopen_apps_scan_sd(&gui_state.storage_service);
+    picopen_apps_snapshot(&app_catalog);
     screen = GUI_HOME;
     home_selection = preferences.home_selection < GUI_HOME_ITEMS
         ? preferences.home_selection : 0u;
@@ -810,6 +930,9 @@ void picopen_gui_init(const picopen_shell_state_t *state) {
         ? preferences.system_selection : 0u;
     files_selection = preferences.files_selection < PICOPEN_STORAGE_MAX_ENTRIES
         ? preferences.files_selection : 0u;
+    workbench_selection = 0u;
+    security_selection = 0u;
+    wifi_selection = 0u;
     selection = home_selection;
     picopen_audit_record("gui.start", true);
     render();
@@ -859,7 +982,7 @@ void picopen_gui_update_state(const picopen_shell_state_t *state) {
 }
 
 void picopen_gui_refresh_workbench(void) {
-    if (screen == GUI_WORKBENCH) {
+    if (screen == GUI_APPS) {
         render_workbench();
     } else if(screen==GUI_RECON){render_recon();
     } else if(screen==GUI_EVIDENCE){render_evidence();
@@ -878,6 +1001,13 @@ void picopen_gui_handle_key(uint8_t key) {
         return;
     }
     if (key == PICOPEN_KEY_ESCAPE) {
+        if (screen == GUI_RECON_CONFIRM || screen == GUI_RECON_HISTORY ||
+            screen == GUI_EVIDENCE_PICKER) {
+            screen = GUI_APPS;
+            selection = workbench_selection;
+            render_workbench();
+            return;
+        }
         if (screen == GUI_RECON) {
             picopen_recon_snapshot_t snapshot;
             picopen_recon_snapshot(&snapshot);
@@ -885,7 +1015,7 @@ void picopen_gui_handle_key(uint8_t key) {
                 const bool cancelled = picopen_recon_cancel();
                 picopen_audit_record("recon.cancel", cancelled);
             }
-            screen = GUI_WORKBENCH;
+            screen = GUI_APPS;
             selection = workbench_selection;
             render_workbench();
             return;
@@ -898,26 +1028,10 @@ void picopen_gui_handle_key(uint8_t key) {
                 const bool cancelled = picopen_evidence_cancel();
                 picopen_audit_record("evidence.cancel", cancelled);
             }
-            screen = GUI_WORKBENCH;
+            screen = GUI_APPS;
             selection = workbench_selection;
             render_workbench();
             return;
-        }
-        if (screen == GUI_WORKBENCH) {
-            picopen_workbench_snapshot_t snapshot;
-            picopen_workbench_snapshot(&snapshot);
-            if (snapshot.state == PICOPEN_WORKBENCH_RUNNING) {
-                const bool cancelled = picopen_workbench_cancel();
-                picopen_audit_record("workbench.cancel", cancelled);
-                render_workbench();
-                return;
-            }
-            if (snapshot.state != PICOPEN_WORKBENCH_IDLE) {
-                (void)picopen_workbench_dismiss();
-                selection = workbench_selection;
-                render_workbench();
-                return;
-            }
         }
         if ((screen == GUI_FILES) && (strcmp(file_path, "/") != 0)) {
             char *const separator = strrchr(file_path, '/');
@@ -969,40 +1083,93 @@ void picopen_gui_handle_key(uint8_t key) {
         }
         return;
     }
-    if (screen == GUI_WORKBENCH) {
+    if (screen == GUI_APPS) {
         const size_t previous = selection;
         if((key==PICOPEN_KEY_UP)&&selection>0u)--selection;
-        else if((key==PICOPEN_KEY_DOWN)&&selection+1u<GUI_WORKBENCH_ITEMS)++selection;
-        else if (key == PICOPEN_KEY_ENTER && selection==0u) {
+        else if((key==PICOPEN_KEY_DOWN)&&selection+1u<app_catalog.count&&selection+1u<GUI_APPS_VISIBLE_ITEMS)++selection;
+        else if(key==PICOPEN_KEY_ENTER && selection<app_catalog.count){
             workbench_selection = selection;
-            const bool started = picopen_workbench_start(
-                &gui_state.devices, time_us_64() / 1000u);
-            picopen_audit_record("workbench.start", started);
-            render_workbench();
-            return;
-        } else if(key==PICOPEN_KEY_ENTER && selection>=1u && selection<=3u){
-            workbench_selection = selection;
-            picopen_engagement_t scope;picopen_engagement_session_snapshot(&scope);
-            const bool authorized=picopen_security_authorize(&gui_state.security,PICOPEN_CAP_NETWORK_PROBE,true);
-            const picopen_recon_kind_t kind=selection==1u?PICOPEN_RECON_DNS:selection==2u?PICOPEN_RECON_ICMP:PICOPEN_RECON_TCP;
-            const bool started=authorized&&picopen_recon_start(kind,scope.target,scope.port_first,time_us_64()/1000u,true);
-            picopen_audit_record("recon.start",started);screen=GUI_RECON;render_recon();
-            return;
-        } else if(key==PICOPEN_KEY_ENTER && selection==4u){
-            workbench_selection = selection;
-            bool started=false;
-            if(files_selection<file_listing.count&&!file_listing.entries[files_selection].directory&&
-               picopen_security_authorize(&gui_state.security,PICOPEN_CAP_STORAGE_READ,false)){
-                char path[PICOPEN_STORAGE_PATH_SIZE];const int length=snprintf(path,sizeof(path),strcmp(file_path,"/")==0?"/%s":"%s/%s",file_path,file_listing.entries[files_selection].name);
-                started=length>0&&(size_t)length<sizeof(path)&&picopen_evidence_start(&gui_state.storage_service,path,file_listing.entries[files_selection].size,true);
-            }
-            picopen_audit_record("evidence.start",started);screen=GUI_EVIDENCE;render_evidence();
+            pending_recon_selection = selection;
+            const picopen_app_kind_t kind=app_catalog.apps[selection].kind;
+            if(kind==PICOPEN_APP_DEVICE_INVENTORY){selection=0u;screen=GUI_APP_DEVICES;render_devices();return;}
+            if(kind==PICOPEN_APP_EVIDENCE_ANALYZER){selection=files_selection<file_listing.count?files_selection:0u;screen=GUI_EVIDENCE_PICKER;render_evidence_picker();return;}
+            if(kind==PICOPEN_APP_RECENT_RESULTS){screen=GUI_RECON_HISTORY;render_recon_history();return;}
+            task_port=kind==PICOPEN_APP_SSH_BANNER?22u:
+                kind==PICOPEN_APP_TLS_INSPECTOR?443u:
+                kind==PICOPEN_APP_HTTP_INSPECTOR?80u:80u;
+            task_field=0u;task_error[0]='\0';screen=GUI_APP_CONFIG;render_app_config();
             return;
         }
         if (selection != previous) {
             workbench_selection = selection;
         }
         render_workbench();
+        return;
+    }
+    if(screen==GUI_APP_CONFIG){
+        const picopen_app_kind_t kind=app_catalog.apps[pending_recon_selection].kind;
+        if(kind==PICOPEN_APP_NETWORK_DISCOVERY||kind==PICOPEN_APP_SESSION_REPORTS||kind==PICOPEN_APP_SD_PACKAGE)return;
+        if(key==PICOPEN_KEY_UP&&task_field>0u)--task_field;
+        else if(key==PICOPEN_KEY_DOWN&&task_field<1u)++task_field;
+        else if(task_field==1u&&key==PICOPEN_KEY_LEFT&&task_port>1u)--task_port;
+        else if(task_field==1u&&key==PICOPEN_KEY_RIGHT&&task_port<65535u)++task_port;
+        else if(task_field==0u&&(key==0x08u||key==0x7fu)&&task_target_length>0u)task_target[--task_target_length]='\0';
+        else if(task_field==0u&&key>=' '&&key<='~'&&task_target_length+1u<sizeof(task_target)){task_target[task_target_length++]=(char)key;task_target[task_target_length]='\0';}
+        else if(key==PICOPEN_KEY_ENTER){if(task_field==0u){task_field=1u;}else if(task_target_length>0u){screen=GUI_RECON_CONFIRM;render_recon_confirm();return;}}
+        render_app_config();return;
+    }
+    if (screen == GUI_RECON_CONFIRM) {
+        if (key == PICOPEN_KEY_ENTER) {
+            picopen_security_context_t task_security = gui_state.security;
+            if (security_mode != PICOPEN_SECURITY_GUARDED) {
+                task_security.engagement_active = true;
+            }
+            const bool authorized = picopen_security_authorize(
+                &task_security, PICOPEN_CAP_NETWORK_PROBE, true);
+            const bool started = authorized && picopen_recon_start(
+                recon_kind_for_selection(pending_recon_selection), task_target,
+                task_port, time_us_64() / 1000u, true,
+                security_mode == PICOPEN_SECURITY_GUARDED);
+            picopen_audit_record("recon.start", started);
+            if (started) {
+                screen = GUI_RECON;
+                render_recon();
+            } else {
+                snprintf(task_error, sizeof(task_error), "%s",
+                    authorized ? "START FAILED: CHECK WIFI / RETRY"
+                               : "DENIED: GUARDED MODE NEEDS SESSION");
+                screen = GUI_APP_CONFIG;
+                render_app_config();
+            }
+        }
+        return;
+    }
+    if (screen == GUI_RECON_HISTORY) return;
+    if (screen == GUI_EVIDENCE_PICKER) {
+        if ((key == PICOPEN_KEY_UP) && selection > 0u) --selection;
+        else if ((key == PICOPEN_KEY_DOWN) && selection + 1u < file_listing.count)
+            ++selection;
+        else if (key == PICOPEN_KEY_ENTER && selection < file_listing.count) {
+            const picopen_storage_entry_t *entry = &file_listing.entries[selection];
+            if (!entry->directory && picopen_security_authorize(
+                    &gui_state.security, PICOPEN_CAP_STORAGE_READ, false)) {
+                char path[PICOPEN_STORAGE_PATH_SIZE];
+                const int length = snprintf(path, sizeof(path),
+                    strcmp(file_path, "/") == 0 ? "/%s" : "%s/%s",
+                    file_path, entry->name);
+                const bool started = length > 0 && (size_t)length < sizeof(path) &&
+                    picopen_evidence_start(&gui_state.storage_service, path,
+                                            entry->size, true);
+                picopen_audit_record("evidence.start", started);
+                if (started) {
+                    files_selection = selection;
+                    screen = GUI_EVIDENCE;
+                    render_evidence();
+                    return;
+                }
+            }
+        }
+        render_evidence_picker();
         return;
     }
     if((screen==GUI_RECON)||(screen==GUI_EVIDENCE))return;
@@ -1064,24 +1231,18 @@ void picopen_gui_handle_key(uint8_t key) {
         static const uint64_t durations_ms[] = {
             UINT64_C(900000), UINT64_C(3600000), UINT64_C(14400000),
         };
-        static const uint16_t port_first[] = {22u,80u,443u,1u};
-        static const uint16_t port_last[] = {22u,80u,443u,1024u};
         if ((key == PICOPEN_KEY_UP) && (selection > 0u)) {
             --selection;
         } else if ((key == PICOPEN_KEY_DOWN) &&
                    (selection + 1u < GUI_SECURITY_ITEMS)) {
             ++selection;
-        } else if ((selection == 3u) && (key == PICOPEN_KEY_LEFT) &&
+        } else if ((selection == 2u) && (key == PICOPEN_KEY_LEFT) &&
                    (engagement_duration_index > 0u)) {
             --engagement_duration_index;
-        } else if ((selection == 3u) && (key == PICOPEN_KEY_RIGHT) &&
+        } else if ((selection == 2u) && (key == PICOPEN_KEY_RIGHT) &&
                    (engagement_duration_index + 1u <
                     sizeof(durations_ms) / sizeof(durations_ms[0]))) {
             ++engagement_duration_index;
-        } else if ((selection == 2u) && (key == PICOPEN_KEY_LEFT) && engagement_port_index>0u) {
-            --engagement_port_index;
-        } else if ((selection == 2u) && (key == PICOPEN_KEY_RIGHT) && engagement_port_index+1u<4u) {
-            ++engagement_port_index;
         } else if (((selection == 0u) || (selection == 1u)) &&
                    ((key == 0x08u) || (key == 0x7Fu)) &&
                    ((selection==0u ? engagement_reference_length : engagement_target_length) > 0u)) {
@@ -1099,26 +1260,30 @@ void picopen_gui_handle_key(uint8_t key) {
             size_t *length=selection==0u ? &engagement_reference_length : &engagement_target_length;
             value[(*length)++]=(char)key; value[*length]='\0';
         } else if (key == PICOPEN_KEY_ENTER) {
-            if (selection < 4u) {
+            if (selection < 3u) {
                 ++selection;
-            } else {
+            } else if(selection==3u) {
                 const uint64_t now_ms = time_us_64() / 1000u;
                 const bool active = picopen_engagement_session_active(now_ms);
                 const bool changed = active
                     ? picopen_engagement_session_deactivate(true)
-                    : picopen_engagement_session_activate_scoped(
+                    : picopen_engagement_session_activate_optional_boundary(
                           engagement_reference, engagement_target,
-                          port_first[engagement_port_index],
-                          port_last[engagement_port_index], now_ms,
+                          now_ms,
                           durations_ms[engagement_duration_index], true);
                 picopen_audit_record(active ? "scope.end" : "scope.start",
                                      changed);
                 picopen_engagement_session_snapshot(&gui_state.engagement);
                 gui_state.security.engagement_active =
                     picopen_engagement_is_active(&gui_state.engagement, now_ms);
+            } else {
+                security_mode=(picopen_security_mode_t)((security_mode+1u)%PICOPEN_SECURITY_MODE_COUNT);
+                (void)picopen_preferences_set_security_mode(security_mode);
+                picopen_audit_record("security.mode",true);
             }
         }
         render_security();
+        security_selection = selection;
         return;
     }
     if (screen == GUI_UPDATE) {
@@ -1212,6 +1377,7 @@ void picopen_gui_handle_key(uint8_t key) {
             (void)changed;
         }
         render_update();
+        wifi_selection = selection;
         return;
     }
     if (screen == GUI_SKINS) {

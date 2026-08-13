@@ -87,6 +87,55 @@ exact target and port scope, rate limit, deadline, cancellation, and scope
 revalidation. Passive scan selection and IP diagnostics do not grant probing
 or remote-control capabilities.
 
+The network inspector adds only bounded client operations. HTTP sends one
+fixed `HEAD /` request, SSH waits passively for the server identification line,
+and all received text is sanitized into a fixed buffer. Results history is
+volatile. TLS inspection has a GUI and service contract but returns
+`UNAVAILABLE` until the pinned TLS configuration, trust/clock policy, and RAM
+budget are reviewed; a raw TCP connection is never presented as a TLS result.
+
+The planned handheld application model separates authorization boundaries from
+task parameters. An authorization profile names the engagement and may add a
+single-host, CIDR, or explicitly selected current-network limit. Individual
+applications own their host, port, path, and count inputs. A missing task target
+is an error and never expands into network-wide probing. Network discovery is a
+separate application with an explicit passive/active choice and a bounded local
+confirmation summary.
+
+Session reporting will cross a dedicated export-only storage boundary rather
+than adding ambient SD mutation. Applications submit typed, bounded result
+records to the session service; they do not format paths or write sectors. A
+locally confirmed export service creates one collision-safe report using a
+temporary/incomplete marker and commits it only after serialization, media
+generation, size, and sync checks pass. The existing removable-read service
+remains incapable of writing. Reports omit secrets and raw payloads by default,
+carry a schema version, and expose a SHA-256 digest after completion.
+
+The planned Apps launcher is a presentation and lifecycle layer above the same
+trusted services; it is not a new authority boundary. Built-in system apps and
+future installed apps use versioned typed requests for networking, hardware,
+storage, audit, and report operations. A declared capability makes a request
+eligible for policy evaluation but never bypasses engagement boundaries or
+local confirmation requirements.
+
+The launcher may discover compatible packages directly in `/PicoPen/apps` and
+run interpreted packages from SD after one concise owner review. Package hashes,
+compatibility, requested permissions, and signature status are still validated,
+but an owner may remember trust for an exact unsigned package hash. Copying into
+managed storage is optional rather than mandatory. Mutable app data remains
+separate from package contents. Arbitrary native RP2350 binaries remain behind
+an explicit developer-mode design gate until crash containment and recovery are
+credible. Core Settings, Recovery, Files, Updates, and diagnostic apps remain
+built into the OS and available without removable media.
+
+PicoPen distinguishes friction from enforcement. Owner mode assumes physical
+local input is deliberate and permits remembered package trust, persistent
+capability grants, and one confirmation per bounded task. Guarded mode asks more
+often. Developer mode enables locally trusted development packages and richer
+diagnostics. All modes retain bounds checking, resource limits, recovery,
+credential isolation, report redaction, and interlocks for irreversible or
+externally harmful actions.
+
 The internal settings service owns the reserved littlefs region. Non-secret
 preferences are versioned and checksummed, secrets use the separately
 authenticated vault format, and watchdog recovery records are fixed-size.

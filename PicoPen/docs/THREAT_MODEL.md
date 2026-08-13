@@ -91,6 +91,47 @@ scanner, listener, stealth mode, payload delivery, credential use, or exploit
 path. The service revalidates scope while a job is running and cancels work when
 the scope expires or is revoked.
 
+HTTP inspection sends only a fixed bounded HEAD request. SSH inspection sends
+nothing after connection and accepts only a bounded printable banner. TLS
+metadata remains disabled unless certificate parsing, peer authentication,
+clock validity, entropy, heap limits, and cancellation have a reviewed contract.
+Inspector history is volatile and never retains packet payloads or credentials.
+
+Blank targets never authorize discovery. Network-wide activity exists only as
+an explicit discovery task constrained to the authorized boundary, with local
+preview and confirmation of the target count and rate.
+
+The Security session may omit a global network limit. This does not supply a
+blank target to an active tool: each active application still collects and
+confirms its target. A configured limit remains an additional service-enforced
+restriction in every security mode.
+
+Session-report export is the only planned removable-media write path in the
+initial security workbench. It requires a separate capability and local action,
+uses bounded typed fields rather than arbitrary application bytes, and excludes
+credentials, keys, PINs, raw payloads, and API secrets. Media removal, filename
+collision, insufficient space, serialization overflow, sync failure, or an
+interrupted write must leave the session available in memory and must not expose
+a completed-looking partial report.
+
+SD application packages, manifests, icons, assets, bytecode, saved state, and
+catalog metadata remain untrusted input, but unsigned does not mean forbidden.
+Owner mode may remember approval for an exact package hash and launch compatible
+interpreted apps directly from `/PicoPen/apps`. Parsing, canonical paths,
+content hashes, compatibility checks, resource limits, and visible signature
+status remain mandatory because they prevent corruption and ambiguity rather
+than second-guessing the operator. Applications do not receive secrets,
+executable flash, boot/update control, or unrestricted peripheral access merely
+because they are locally approved. Resource exhaustion, malformed bytecode, and
+crashes must fail within the app boundary while built-in recovery remains
+available.
+
+The local owner is trusted to choose tools and targets. The system focuses hard
+interlocks on actions whose effects are difficult to undo, easy to trigger
+remotely, capable of exposing secrets, or capable of affecting third parties.
+Routine local navigation, read-only inspection, SD browsing, and previously
+approved bounded app tasks should not accumulate repetitive confirmation steps.
+
 ## Out of scope for version 1
 
 - Protection against invasive physical attacks on the RP2350 or flash

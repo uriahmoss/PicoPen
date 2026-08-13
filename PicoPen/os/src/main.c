@@ -362,16 +362,26 @@ int main(void) {
                                 &heartbeat_context);
 
     uint64_t next_evidence_ui_ms = 0u;
+    uint64_t next_key_repeat_ms = 0u;
     uint64_t next_device_health_ms =
         time_us_64() / 1000u + PICOPEN_DEVICE_HEALTH_MS;
     picopen_wifi_state_t last_wifi_state = PICOPEN_WIFI_OFF;
 
     for (;;) {
         picopen_key_event_t event;
-        if (display_ready && keyboard_ready && picopen_keyboard_poll(&event) &&
-            (event.state == PICOPEN_KEY_PRESSED)) {
-            picopen_gui_handle_key(event.key);
-            printf("key: 0x%02x state=%u\r\n", event.key, event.state);
+        if (display_ready && keyboard_ready && picopen_keyboard_poll(&event)) {
+            const uint64_t key_now_ms = time_us_64() / 1000u;
+            const bool navigation_key = event.key == PICOPEN_KEY_UP ||
+                event.key == PICOPEN_KEY_DOWN || event.key == PICOPEN_KEY_LEFT ||
+                event.key == PICOPEN_KEY_RIGHT;
+            const bool pressed = event.state == PICOPEN_KEY_PRESSED;
+            const bool repeated = event.state == PICOPEN_KEY_HELD && navigation_key &&
+                key_now_ms >= next_key_repeat_ms;
+            if (pressed || repeated) {
+                picopen_gui_handle_key(event.key);
+                next_key_repeat_ms = key_now_ms + (pressed ? 300u : 140u);
+                printf("key: 0x%02x state=%u\r\n", event.key, event.state);
+            }
         }
         const picopen_gui_storage_action_t storage_action =
             picopen_gui_take_storage_action();
@@ -449,7 +459,12 @@ int main(void) {
         }
         if(picopen_recon_poll(now_ms)){
             picopen_recon_snapshot_t snapshot;picopen_recon_snapshot(&snapshot);
-            picopen_audit_record(snapshot.state==PICOPEN_RECON_COMPLETE?"recon.done":"recon.failed",snapshot.state==PICOPEN_RECON_COMPLETE);
+            if (snapshot.state >= PICOPEN_RECON_COMPLETE) {
+                picopen_audit_record(
+                    snapshot.state==PICOPEN_RECON_COMPLETE
+                        ? "recon.done" : "recon.failed",
+                    snapshot.state==PICOPEN_RECON_COMPLETE);
+            }
             picopen_gui_refresh_workbench();
         }
         if(picopen_evidence_poll()){

@@ -16,9 +16,8 @@ typedef struct picopen_engagement {
     char target[PICOPEN_ENGAGEMENT_TARGET_SIZE];
     uint32_t network;
     uint32_t netmask;
-    uint16_t port_first;
-    uint16_t port_last;
     bool hostname_target;
+    bool boundary_configured;
 } picopen_engagement_t;
 
 void picopen_engagement_init(picopen_engagement_t *engagement);
@@ -39,11 +38,21 @@ bool picopen_engagement_session_activate_scoped(
     const char *reference, const char *target, uint16_t port_first,
     uint16_t port_last, uint64_t now_ms, uint64_t duration_ms,
     bool local_confirmation);
+bool picopen_engagement_session_activate_boundary(
+    const char *reference, const char *target, uint64_t now_ms,
+    uint64_t duration_ms, bool local_confirmation);
+bool picopen_engagement_session_activate_optional_boundary(
+    const char *reference, const char *target, uint64_t now_ms,
+    uint64_t duration_ms, bool local_confirmation);
 bool picopen_engagement_session_allows_ipv4(uint32_t address, uint16_t port,
                                             uint64_t now_ms);
 bool picopen_engagement_session_allows_hostname(const char *hostname,
                                                 uint16_t port,
                                                 uint64_t now_ms);
+bool picopen_engagement_session_allows_task_ipv4(uint32_t address,
+                                                 uint64_t now_ms);
+bool picopen_engagement_session_allows_task_hostname(const char *hostname,
+                                                     uint64_t now_ms);
 bool picopen_engagement_session_deactivate(bool local_confirmation);
 bool picopen_engagement_session_poll(uint64_t now_ms);
 void picopen_engagement_session_snapshot(picopen_engagement_t *engagement);

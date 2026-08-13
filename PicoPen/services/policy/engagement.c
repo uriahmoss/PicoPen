@@ -126,19 +126,52 @@ bool picopen_engagement_session_activate_scoped(
     if (!cidr && !valid_hostname(target)) { picopen_engagement_deactivate(&session); return false; }
     strncpy(session.target,target,sizeof(session.target)-1u);
     session.network=network; session.netmask=mask; session.hostname_target=!cidr;
-    session.port_first=port_first; session.port_last=port_last; return true;
+    session.boundary_configured=true;
+    return true;
 }
 
-static bool port_allowed(uint16_t port) {
-    return port>=session.port_first && port<=session.port_last;
+bool picopen_engagement_session_activate_boundary(
+    const char *reference, const char *target, uint64_t now_ms,
+    uint64_t duration_ms, bool local_confirmation) {
+    return picopen_engagement_session_activate_scoped(
+        reference, target, 1u, UINT16_MAX, now_ms, duration_ms,
+        local_confirmation);
 }
+
+bool picopen_engagement_session_activate_optional_boundary(
+    const char *reference, const char *target, uint64_t now_ms,
+    uint64_t duration_ms, bool local_confirmation) {
+    if (target && target[0]) {
+        return picopen_engagement_session_activate_boundary(
+            reference, target, now_ms, duration_ms, local_confirmation);
+    }
+    return picopen_engagement_session_activate(
+        reference, now_ms, duration_ms, local_confirmation);
+}
+
 bool picopen_engagement_session_allows_ipv4(uint32_t address,uint16_t port,uint64_t now_ms) {
-    return picopen_engagement_is_active(&session,now_ms) && !session.hostname_target &&
-        port_allowed(port) && (address & session.netmask)==session.network;
+    (void)port;
+    if (!picopen_engagement_is_active(&session,now_ms)) return false;
+    if (!session.boundary_configured) return true;
+    return !session.hostname_target &&
+        (address & session.netmask)==session.network;
 }
 bool picopen_engagement_session_allows_hostname(const char *hostname,uint16_t port,uint64_t now_ms) {
-    return hostname && picopen_engagement_is_active(&session,now_ms) && session.hostname_target &&
-        port_allowed(port) && strcmp(hostname,session.target)==0;
+    (void)port;
+    if (!hostname || !picopen_engagement_is_active(&session,now_ms)) return false;
+    if (!session.boundary_configured) return true;
+    return session.hostname_target &&
+        strcmp(hostname,session.target)==0;
+}
+
+bool picopen_engagement_session_allows_task_ipv4(uint32_t address,
+                                                 uint64_t now_ms) {
+    return picopen_engagement_session_allows_ipv4(address, 1u, now_ms);
+}
+
+bool picopen_engagement_session_allows_task_hostname(const char *hostname,
+                                                     uint64_t now_ms) {
+    return picopen_engagement_session_allows_hostname(hostname, 1u, now_ms);
 }
 
 bool picopen_engagement_session_deactivate(bool local_confirmation) {

@@ -1,7 +1,7 @@
 #include "picopen/preferences.h"
 #include <stddef.h>
 #include "picopen/internal_fs.h"
-#define PREFERENCES_VERSION 1u
+#define PREFERENCES_VERSION 2u
 #define PREFERENCES_FILE "/settings.v1"
 static picopen_preferences_t current;
 static uint32_t checksum(const picopen_preferences_t *preferences) {
@@ -26,6 +26,7 @@ void picopen_preferences_init(void) {
     if (!picopen_internal_fs_read(PREFERENCES_FILE,&stored,sizeof(stored),&length) ||
         length != sizeof(stored) || stored.version != PREFERENCES_VERSION ||
         stored.size != sizeof(stored) || stored.skin >= 4u ||
+        stored.security_mode >= PICOPEN_SECURITY_MODE_COUNT ||
         stored.backlight_percent > 100u || stored.checksum != checksum(&stored)) return;
     current = stored;
 }
@@ -38,3 +39,8 @@ bool picopen_preferences_set_menu(size_t home,size_t system,size_t files) {
 }
 bool picopen_preferences_set_backlight(uint8_t percent) { if(percent>100u)return false; current.backlight_percent=percent; return save(); }
 bool picopen_preferences_set_wifi_auto_enable(bool enabled) { current.wifi_auto_enable=enabled; return save(); }
+bool picopen_preferences_set_security_mode(picopen_security_mode_t mode) {
+    if (mode >= PICOPEN_SECURITY_MODE_COUNT) return false;
+    current.security_mode = (uint8_t)mode;
+    return save();
+}

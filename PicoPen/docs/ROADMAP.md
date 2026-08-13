@@ -72,6 +72,128 @@ review gates and are never implied by acceleration.
   - Online signed-manifest checking and locally approved download
   - Current-Wi-Fi and private-network upload portals
   - Inactive-slot staging, independent boot validation, and automatic rollback
+- [ ] **Bundle E: Flipper-style task applications and session reports**
+  - Adopt an owner-controlled trust model: assume deliberate local input comes
+    from a knowledgeable operator, minimize repeated prompts, and concentrate
+    safeguards on remote control, irreversible changes, secrets, target power,
+    unattended automation, broad active scanning, and radio transmission
+  - [x] Replace the global target-and-port editor with a lightweight authorization
+    profile containing an engagement reference, optional target boundary, and expiry
+  - [x] Support explicit target boundaries for a single host or CIDR/network;
+    the boundary is an optional additional restriction and never substitutes
+    for the target entered by an application
+  - [x] Move host and port inputs into each network application baseline; add
+    path, count, and additional app-specific options as those operations mature
+    with safe defaults and bounded remembered values
+  - [x] Add appliance-style Network Discovery, Host Inspector, HTTP Inspector, SSH
+    Banner, TLS Inspector, Device Inventory, Evidence Analyzer, and Recent
+    Results applications
+  - Make passive local discovery the default; require a dedicated confirmation
+    screen for bounded active discovery that shows subnet, address count, probe
+    type, rate, and estimated duration
+  - Continue enforcing authorization boundaries, capabilities, live expiry,
+    rate limits, deadlines, cancellation, and sanitized audit records below the
+    application UI
+  - Add **End Session & Export Report** and **Export Current Report** actions
+    - Keep removable storage read-only until the separate export-only mutation
+      service and FAT power-loss behavior pass review and hardware testing
+    - Require a locally confirmed `evidence.export` capability for every report
+      and never grant general application-level SD write access
+    - Create a new bounded report file atomically under a dedicated PicoPen
+      reports directory; never overwrite an existing report without a separate
+      explicit confirmation
+    - Include report/schema version, PicoPen build, engagement reference,
+      authorized boundary, start/end times and clock quality, task parameters,
+      sanitized results, errors, evidence hashes, and audit-record references
+    - Exclude Wi-Fi credentials, vault PINs, keys, raw packet payloads, API
+      credentials, and other secrets by default
+    - Provide a human-readable summary plus a machine-readable structured form;
+      approve the exact format and filename policy before implementation
+    - Bound report count, per-report size, total report storage, field lengths,
+      and serialization time; handle full, removed, corrupt, and interrupted SD
+      media without losing the in-memory session
+    - Hash the completed report and show its filename, byte count, and SHA-256
+      locally; authenticated signing remains deferred to the signing-policy gate
+    - Allow export retry or USB/Wi-Fi transfer later without automatically
+      enabling any listener, portal, or network upload
+  - [x] Replace the Home **Workbench** tile with an **Apps** launcher
+    - Ship Network Discovery, Host Inspector, HTTP Inspector, SSH Banner, TLS
+      Inspector, Device Inventory, Evidence Analyzer, Recent Results, and
+      Session Reports as built-in system apps
+    - Give every app its own icon, semantic screen model, remembered navigation
+      state, help/about page, capability declaration, and bounded task settings
+    - Keep drivers, authorization enforcement, audit, storage, networking,
+      secrets, transmit interlocks, and report export in PicoPen-owned services;
+      apps can request operations but cannot access peripherals or flash directly
+    - Add Favorites, Recent, System Apps, and Installed Apps views, hiding empty
+      categories and preserving an appliance-style Enter/Open and Escape/Back flow
+  - Add a reviewed SD-installed application platform in phases
+    - [x] Add a bounded catalog with nine built-in descriptors and read-only
+      discovery of `.ppapp` packages under `/PicoPen/apps`; discovered packages
+      remain non-runnable until the manifest/runtime validator is implemented
+    - [ ] Define a versioned fixed-size application manifest with package ID,
+      name, version, PicoPen API version, entry type, resource limits,
+      capabilities, content hashes, publisher identity, and signature metadata
+    - [ ] Define a bounded package/archive format with canonical paths, total and
+      per-file limits, duplicate-name rejection, traversal protection, and no
+      implicit execution while browsing removable media
+    - [ ] Let the Apps launcher immediately discover compatible packages in a
+      conventional `/PicoPen/apps` SD directory without requiring an import step
+    - [ ] Provide one concise first-run review showing source, compatibility,
+      requested capabilities, signature status, and risk; remember the owner's
+      decision for that exact package hash and do not prompt again after reboot
+    - [ ] Support trusted signed packages and locally trusted unsigned packages;
+      unsigned status must remain visible but must not prevent an owner from
+      running their own compatible app
+    - [ ] Run compatible interpreted packages directly from SD when practical,
+      while storing mutable app data separately; installation/copying is optional
+      for favorites, offline availability, performance, or update management
+    - [ ] Use a resource-bounded interpreter/bytecode runtime as the first
+      third-party execution model; evaluate an explicitly enabled native-app
+      developer mode after crash containment and recovery behavior are proven
+    - [ ] Provide narrow versioned APIs for UI views, read-only app assets,
+      bounded app data, timers, typed service requests, progress, cancellation,
+      and sanitized result/report records
+    - [ ] Show capabilities clearly and support remembered grants chosen by the
+      owner; distinguish session, persistent, engagement-bound, and always-ask
+      grants without forcing one-time approval for ordinary read-only operations
+    - [ ] Require confirmation at the task boundary rather than every service
+      call; one approved bounded task may perform its declared steps without
+      repeated prompts
+    - [ ] Keep always-ask confirmation only for target power, irreversible
+      configuration, credential disclosure, firmware changes, USB input
+      automation, broad/unattended active scanning, and radio transmission
+    - [ ] Enforce per-app stack/heap, instruction/time, file, message, result,
+      network, and crash limits; terminate a failed app without restarting core
+      services or losing recovery access
+    - [ ] Give each app an isolated data directory and prohibit access to Wi-Fi
+      credentials, signing keys, vault records, other apps, raw flash, boot
+      metadata, and unrestricted SD mutation
+    - [ ] Add Disable, Uninstall, Verify, Update, Reset Data, and View Permissions
+      actions with sanitized audit records and safe handling of missing media
+    - [ ] Define publisher signing, revocation, API compatibility, rollback, and
+      recovery-mode disable policies before enabling third-party installation
+    - [ ] Preserve a built-in safe-app allowlist so Settings, Recovery, Files,
+      Updates, and core diagnostic apps work with no SD card or installed apps
+  - [x] Add **Security Mode** under Settings
+    - **Owner** is the normal default: remembered app trust and permissions,
+      task-level confirmation, routine SD access, and concise risk indicators
+    - **Guarded** restores confirmation for every active assessment task and
+      refuses unsigned apps unless individually approved
+    - **Developer** permits locally trusted unsigned development packages and
+      richer diagnostics while keeping boot recovery, memory bounds, secrets
+      isolation, and irreversible hardware protections intact
+    - Switching mode requires local input and is persistently visible in Status;
+      no mode may disable image bounds, parser limits, recovery, or secret
+      redaction
+    - Baseline behavior: Owner and Developer permit locally confirmed bounded
+      tasks without a preconfigured boundary; Guarded requires one. Any active
+      boundary remains enforced in every mode.
+  - Hardware acceptance: the Apps launcher, optional session limit, per-app
+    target entry, locally confirmed network task, live elapsed-time repaint,
+    asynchronous terminal result, result history, and Device Inventory routing
+    were verified on PicoCalc hardware. Build verification passed with 58 host
+    tests and bounded UF2 artifacts.
 
 ## Milestone 1: first boot
 
@@ -264,6 +386,9 @@ power interruptions without corrupting its boot metadata.
       the SD card. This is provisional acceptance, not hardware evidence.
   - [ ] Separate evidence export and privileged mutation into independently
     authorized interfaces; removable read access is now separate
+    - [ ] Add an export-only append/create service for bounded session reports
+      with atomic completion, explicit local confirmation, collision-safe names,
+      media-generation checks, deadlines, and no general write/delete/rename API
   - Require explicit capability and local policy for every SD write
   - [x] Add user-facing safe-remove and explicit rescan actions with media
     generation reporting
@@ -413,6 +538,11 @@ power interruptions without corrupting its boot metadata.
   - [x] Add locally confirmed, single-request DNS, ICMP, and TCP diagnostics
     with rate limiting, cancellation, deadline, audit, and live scope checks
   - Separate connection, passive observation, and active probing capabilities
+  - [ ] Replace port-range scope configuration with the Bundle E authorization
+    profile and per-application task inputs; an optional profile boundary narrows
+    targets but is not required to activate a session
+  - [ ] Add explicit, bounded current-network discovery; blank task targets must
+    fail with `TARGET REQUIRED` rather than expanding scope implicitly
 - [ ] Secure Wi-Fi software update
   - [ ] Approve the production signature and key-rotation policy
   - [ ] Approve an inactive update-slot and rollback flash layout
@@ -445,7 +575,15 @@ power interruptions without corrupting its boot metadata.
 - [x] Scoped TCP connection/service identification baseline
 - [x] Read-only evidence baseline with bounded SHA-256, printable-string count,
   and PCAP/PCAPNG packet inventory
-- [ ] HTTP and TLS inspection
+- [x] Add locally confirmed HTTP HEAD and passive SSH-banner inspection with
+  fixed response limits, deadlines, cancellation, history, and live scope checks
+- [x] Add direct evidence selection, bounded string previews, SHA-256 comparison
+  API, and Ethernet protocol summaries for PCAP/PCAPNG
+- [ ] TLS certificate inspection
+  - [x] Add the scoped operation, confirmation, result, and fail-closed service
+    contract
+  - [ ] Approve and pin the TLS client configuration, trust behavior, clock
+    policy, and RAM budget before enabling a handshake
 - [ ] SSH client
 - [ ] BLE inventory
 
@@ -482,8 +620,12 @@ any time. PicoPen remains safe and useful when the bridge is unavailable.
 
 ## Milestone 8: application SDK and release
 
-- [ ] Lua runtime and capability-limited APIs
-- [ ] Package format and signing
+- [ ] Capability-limited interpreted application runtime
+  - Evaluate Lua against a smaller deterministic bytecode runtime for RP2350
+    memory use, parser safety, cancellation, and API versioning
+- [ ] Application package format, manifests, publisher signing, and revocation
+- [ ] PicoPen application SDK, emulator/test harness, examples, and documentation
+- [ ] Apps catalog/index format and authenticated USB/Wi-Fi installation transport
 - [ ] Reproducible release pipeline
 - [ ] Hardware-in-the-loop regression fixture
 - [ ] Version 1.0 security and documentation review
