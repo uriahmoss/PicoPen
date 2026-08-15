@@ -24,6 +24,7 @@ add_executable(picopen_os
     ../services/recon/recon.c
     ../services/evidence/evidence.c
     ../services/apps/apps.c
+    ../services/attachment/attachment.c
     ../services/policy/engagement.c
     ../third_party/fatfs/ff.c
     ../third_party/littlefs/lfs.c
@@ -65,6 +66,7 @@ target_include_directories(picopen_os PRIVATE
     ${PROJECT_SOURCE_DIR}/services/recon/include
     ${PROJECT_SOURCE_DIR}/services/evidence/include
     ${PROJECT_SOURCE_DIR}/services/apps/include
+    ${PROJECT_SOURCE_DIR}/services/attachment/include
     ${PROJECT_SOURCE_DIR}/services/policy/include
     ${PROJECT_SOURCE_DIR}/third_party/fatfs
     ${PROJECT_SOURCE_DIR}/third_party/littlefs

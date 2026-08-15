@@ -7,6 +7,7 @@
 #include "pico/stdlib.h"
 
 #include "picopen/audit.h"
+#include "picopen/attachment.h"
 #include "picopen/apps.h"
 #include "picopen/crayon_renderer.h"
 #include "picopen/display.h"
@@ -537,6 +538,17 @@ static void render_devices(void) {
         append("%-16s %s\n", device->name,
                picopen_device_state_name(device->state));
     }
+    picopen_attachment_registry_t attachments;
+    picopen_attachment_snapshot(&attachments);
+    append("\nATTACHMENTS %u%s\n", (unsigned)attachments.count,
+           attachments.truncated ? "+" : "");
+    for (size_t index = 0u; index < attachments.count; ++index) {
+        const picopen_attachment_record_t *record = &attachments.records[index];
+        append("%.14s %-4s %s%s\n", record->descriptor.name,
+               picopen_attachment_transport_name(record->descriptor.transport),
+               picopen_attachment_state_name(record->state),
+               record->descriptor.mock ? " TEST" : "");
+    }
     append("\nESC BACK\n");
     present();
 }
@@ -549,8 +561,8 @@ static void render_workbench(void) {
     const size_t shown=app_catalog.count<GUI_APPS_VISIBLE_ITEMS?app_catalog.count:GUI_APPS_VISIBLE_ITEMS;
     for(size_t index=0u;index<shown;++index){
         const picopen_app_descriptor_t *app=&app_catalog.apps[index];
-        append(selection==index?"> %-22.22s%s\n":"  %-22.22s%s\n",app->name,
-               app->built_in?"":" SD");
+        append(selection==index?"> %-19.19s%s\n":"  %-19.19s%s\n",app->name,
+               !picopen_app_available(app)?" MISSING":app->built_in?"":" SD");
     }
     append("\nENTER OPEN  ESC BACK\nSD APPS: /PicoPen/apps\n");
     present();

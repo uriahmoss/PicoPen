@@ -31,6 +31,8 @@
   and USB input automation.
 - Apply regional frequency and power policy below the application layer.
 - Default newly detected attachments to unpowered or receive-only operation.
+- Treat provider registration as descriptive rather than authorization: an
+  available provider cannot grant an App permission or energize its transport.
 - Never store secrets in plaintext audit records.
 - Deny sensitive operations when capability, scope, clock validity, audit
   availability, or required physical confirmation cannot be established.

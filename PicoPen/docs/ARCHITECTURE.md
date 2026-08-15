@@ -79,6 +79,15 @@ separate receive, analyze, and transmit capabilities.
 Long-lived services manage the terminal, storage, networking, attachments,
 engagement scope, secrets, and audit records.
 
+Attachments register bounded versioned descriptors with the PicoPen-owned
+registry. Descriptors identify transport, lifecycle state, current budget, and
+abstract capabilities; they never expose direct peripheral access to Apps.
+Apps depend on providers such as NFC read, IR receive, UART monitor, or logic
+capture rather than on a specific chip. Provider matching occurs at runtime so
+built-in, USB, GPIO, I2C, SPI, UART, and PIO implementations can be substituted.
+Receive/observe providers remain distinct from transmit, emulation, target
+power, and bus-drive providers. The registry does not initialize hardware.
+
 The networking service owns CYW43 and lwIP polling, association deadlines,
 DHCP state, and sanitized local diagnostics. Sockets, netconn APIs, and TCP
 listeners remain disabled. A narrow raw-lwIP recon service can issue one

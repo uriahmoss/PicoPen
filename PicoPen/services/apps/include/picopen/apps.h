@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "picopen/storage.h"
+#include "picopen/attachment.h"
 
 #define PICOPEN_APP_ID_SIZE 24u
 #define PICOPEN_APP_NAME_SIZE 24u
@@ -30,6 +31,7 @@ typedef struct picopen_app_descriptor {
     char name[PICOPEN_APP_NAME_SIZE];
     picopen_app_kind_t kind;
     uint32_t requested_capabilities;
+    int16_t required_provider;
     bool built_in;
     bool compatible;
     bool signed_package;
@@ -46,5 +48,6 @@ void picopen_apps_init(void);
 void picopen_apps_scan_sd(picopen_storage_service_t *storage);
 void picopen_apps_snapshot(picopen_app_catalog_t *catalog);
 const char *picopen_app_kind_name(picopen_app_kind_t kind);
+bool picopen_app_available(const picopen_app_descriptor_t *app);
 
 #endif

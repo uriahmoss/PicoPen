@@ -13,6 +13,7 @@
 #include "picopen/boot_metadata.h"
 #include "picopen/audit.h"
 #include "picopen/capability.h"
+#include "picopen/attachment.h"
 #include "picopen/device.h"
 #include "picopen/engagement.h"
 #include "picopen/ipc.h"
@@ -125,6 +126,18 @@ int main(void) {
     watchdog_hw->scratch[PICOPEN_BOOT_ATTEMPT_SCRATCH] = 0u;
     watchdog_disable();
     picopen_audit_init();
+    picopen_attachment_init();
+    const picopen_attachment_descriptor_t mock_nfc = {
+        .abi_version = PICOPEN_ATTACHMENT_ABI_VERSION,
+        .id = "mock.pn532",
+        .name = "PN532 TEST PROVIDER",
+        .transport = PICOPEN_ATTACHMENT_TRANSPORT_MOCK,
+        .capabilities = UINT64_C(1) << PICOPEN_PROVIDER_NFC_READ,
+        .external_power_required = true,
+        .mock = true,
+    };
+    (void)picopen_attachment_register(
+        &mock_nfc, PICOPEN_ATTACHMENT_DISABLED_POLICY);
     picopen_skin_init();
     picopen_workbench_init();
     picopen_engagement_session_init();

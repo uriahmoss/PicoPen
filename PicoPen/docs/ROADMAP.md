@@ -420,7 +420,17 @@ power interruptions without corrupting its boot metadata.
       requirements; a boot-time self-test verifies privileged denial.
 - [ ] Device manager and attachment descriptors
   - [x] Add a fixed-capacity device inventory and policy-visible states
-  - [ ] Parse and validate versioned attachment descriptors
+  - [x] Add a versioned, fixed-capacity runtime attachment registry with
+    validated built-in descriptors, transport/lifecycle state, generation,
+    health error, and capability-provider matching
+  - [x] Add a disabled mock PN532 read provider for hardware-free registry and
+    Apps availability testing; it performs no bus or GPIO operations
+    - Hardware evidence: the PicoCalc displayed the mock PN532 provider with
+      the expected disabled/test state, while existing OS functions continued
+      to operate as expected. No external attachment was connected or powered.
+  - [ ] Parse and validate untrusted attachment descriptors from external media
+  - [ ] Characterize and approve the side expansion connector before enabling
+    physical attachment discovery or driver initialization
 - [ ] Filesystem, settings, audit, and engagement-scope services
   - [x] Add bounded root-only removable-file reads behind `storage.read`
   - [x] Add an inactive-by-default, reference-and-expiry engagement state
@@ -516,6 +526,11 @@ power interruptions without corrupting its boot metadata.
 - [ ] Use Pico SDK-pinned TinyUSB and networking stacks behind capability checks
 
 ## Milestone 4: safe hardware workbench
+
+- [x] Add transport-agnostic attachment capability-provider foundation
+- [x] Separate NFC, Sub-GHz, and IR observe capabilities from active operations
+- [x] Expose attachment transport, lifecycle, mock, and missing-provider state
+  through Devices and Apps without activating external buses
 
 - [ ] GPIO and UART tools
 - [ ] I2C and SPI workbenches
