@@ -14,6 +14,7 @@
 #include "picopen/audit.h"
 #include "picopen/capability.h"
 #include "picopen/attachment.h"
+#include "picopen/hosts.h"
 #include "picopen/device.h"
 #include "picopen/engagement.h"
 #include "picopen/ipc.h"
@@ -127,6 +128,7 @@ int main(void) {
     watchdog_disable();
     picopen_audit_init();
     picopen_attachment_init();
+    picopen_hosts_init();
     const picopen_attachment_descriptor_t mock_nfc = {
         .abi_version = PICOPEN_ATTACHMENT_ABI_VERSION,
         .id = "mock.pn532",
@@ -430,6 +432,7 @@ int main(void) {
         picopen_wifi_poll();
         picopen_wifi_status_t wifi_status;
         picopen_wifi_get_status(&wifi_status);
+        picopen_hosts_observe_wifi(&wifi_status, now_ms);
         if (wifi_status.state != last_wifi_state) {
             last_wifi_state = wifi_status.state;
             const picopen_device_state_t device_state =
@@ -473,6 +476,7 @@ int main(void) {
         if(picopen_recon_poll(now_ms)){
             picopen_recon_snapshot_t snapshot;picopen_recon_snapshot(&snapshot);
             if (snapshot.state >= PICOPEN_RECON_COMPLETE) {
+                picopen_hosts_observe_recon(&snapshot, now_ms);
                 picopen_audit_record(
                     snapshot.state==PICOPEN_RECON_COMPLETE
                         ? "recon.done" : "recon.failed",

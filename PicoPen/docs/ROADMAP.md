@@ -91,6 +91,14 @@ review gates and are never implied by acceleration.
   - Make passive local discovery the default; require a dedicated confirmation
     screen for bounded active discovery that shows subnet, address count, probe
     type, rate, and estimated duration
+    - [x] Add a bounded passive/task-derived host inventory containing local,
+      gateway, DNS, and completed-task addresses
+    - [x] Let a selected host launch Host, HTTP, SSH, or TLS inspectors with a
+      pre-filled target and port, preserving host/action navigation on return
+      - Hardware evidence: local/gateway/DNS hosts appeared on the PicoCalc,
+        target and port handoff worked, inspectors produced results, Recent
+        Results reuse worked, and Escape returned to the same host action after
+        the final hardcoded Apps return path was removed.
   - Continue enforcing authorization boundaries, capabilities, live expiry,
     rate limits, deadlines, cancellation, and sanitized audit records below the
     application UI
@@ -127,6 +135,8 @@ review gates and are never implied by acceleration.
       apps can request operations but cannot access peripherals or flash directly
     - Add Favorites, Recent, System Apps, and Installed Apps views, hiding empty
       categories and preserving an appliance-style Enter/Open and Escape/Back flow
+    - [x] Add selectable Recent Results details and reuse a result address/port
+      as the input to its corresponding inspector
   - Add a reviewed SD-installed application platform in phases
     - [x] Add a bounded catalog with nine built-in descriptors and read-only
       discovery of `.ppapp` packages under `/PicoPen/apps`; discovered packages

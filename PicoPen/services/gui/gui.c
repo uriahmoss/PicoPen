@@ -8,6 +8,7 @@
 
 #include "picopen/audit.h"
 #include "picopen/attachment.h"
+#include "picopen/hosts.h"
 #include "picopen/apps.h"
 #include "picopen/crayon_renderer.h"
 #include "picopen/display.h"
@@ -51,10 +52,13 @@ typedef enum gui_screen {
     GUI_DEVICES,
     GUI_APPS,
     GUI_APP_DEVICES,
+    GUI_HOSTS,
+    GUI_HOST_ACTIONS,
     GUI_APP_CONFIG,
     GUI_RECON_CONFIRM,
     GUI_RECON,
     GUI_RECON_HISTORY,
+    GUI_RECON_HISTORY_DETAIL,
     GUI_EVIDENCE_PICKER,
     GUI_EVIDENCE,
     GUI_AUDIT,
@@ -84,6 +88,11 @@ static size_t task_target_length;
 static uint16_t task_port = 80u;
 static size_t task_field;
 static char task_error[48];
+static size_t host_selection;
+static size_t host_action_selection;
+static size_t result_selection;
+static picopen_recon_snapshot_t selected_result;
+static gui_screen_t task_return_screen = GUI_APPS;
 static picopen_security_mode_t security_mode;
 static size_t files_selection;
 static picopen_storage_listing_t file_listing;
@@ -576,6 +585,12 @@ static picopen_recon_kind_t recon_kind_for_selection(size_t index) {
     return PICOPEN_RECON_TCP;
 }
 
+static size_t app_index_for_kind(picopen_app_kind_t kind) {
+    for (size_t index=0u; index<app_catalog.count; ++index)
+        if (app_catalog.apps[index].kind==kind) return index;
+    return app_catalog.count;
+}
+
 static void render_app_config(void){
     const picopen_app_descriptor_t *app=&app_catalog.apps[pending_recon_selection];
     begin("APP TASK");
@@ -625,14 +640,62 @@ static void render_recon_history(void) {
     for (size_t index = 0u; index < count; ++index) {
         picopen_recon_snapshot_t entry;
         if (picopen_recon_history_get(index, &entry)) {
-            append("%-9s %-10s %.14s:%u\n",
+            append(index==selection?"> %-8s %-9s %.13s:%u\n":"  %-8s %-9s %.13s:%u\n",
                    picopen_recon_kind_name(entry.kind),
                    picopen_recon_state_name(entry.state), entry.target,
                    entry.port);
         }
     }
-    append("\nVOLATILE / SANITIZED\nESC BACK\n");
+    append("\nENTER DETAILS  VOLATILE\nESC BACK\n");
     present();
+}
+
+static void render_recon_history_detail(void) {
+    begin("RESULT DETAIL");
+    append("\nOP %s\nSTATE %s\nTARGET %.30s\nADDRESS %s\nPORT %u  SERVICE %s\nDURATION %lu MS  RX %lu\nDETAIL %.80s\nRESULT %d\n\nENTER USE HOST  ESC BACK\n",
+        picopen_recon_kind_name(selected_result.kind),
+        picopen_recon_state_name(selected_result.state), selected_result.target,
+        selected_result.address[0]?selected_result.address:"-",
+        selected_result.port, selected_result.service,
+        (unsigned long)selected_result.elapsed_ms,
+        (unsigned long)selected_result.bytes_received,
+        selected_result.detail[0]?selected_result.detail:"-",
+        selected_result.result);
+    present();
+}
+
+static void render_hosts(void) {
+    begin("DISCOVERED HOSTS");
+    picopen_host_inventory_t hosts;
+    picopen_hosts_snapshot(&hosts);
+    picopen_wifi_status_t wifi;
+    picopen_wifi_get_status(&wifi);
+    append("WIFI %s  HOSTS %u%s\n\n", picopen_wifi_state_name(wifi.state),
+           (unsigned)hosts.count, hosts.truncated?"+":"");
+    if (hosts.count == 0u) append("NO HOSTS OBSERVED\nCONNECT WIFI OR RUN A TASK\n");
+    for (size_t index=0u; index<hosts.count; ++index) {
+        const picopen_host_record_t *host=&hosts.records[index];
+        append(index==selection?"> %-15s %-7s %s\n":"  %-15s %-7s %s\n",
+               host->address, picopen_host_source_name(host->source),
+               host->reachable?"UP":"SEEN");
+    }
+    append("\nPASSIVE + TASK RESULTS\nENTER ACTIONS  ESC BACK\n");
+    present();
+}
+
+static void render_host_actions(void) {
+    static const char *const actions[] = {
+        "HOST INSPECTOR :80", "HTTP INSPECTOR :80",
+        "SSH BANNER :22", "TLS INSPECTOR :443",
+    };
+    picopen_host_inventory_t hosts;
+    picopen_hosts_snapshot(&hosts);
+    begin("HOST ACTIONS");
+    if (host_selection>=hosts.count) { append("\nHOST NO LONGER AVAILABLE\nESC BACK\n");present();return; }
+    append("\nTARGET %s\n",hosts.records[host_selection].address);
+    for(size_t index=0u;index<4u;++index)
+        append(index==selection?"> %s\n":"  %s\n",actions[index]);
+    append("\nENTER CONFIGURE  ESC BACK\n");present();
 }
 
 static void render_evidence_picker(void) {
@@ -843,10 +906,13 @@ static void render(void) {
         case GUI_DEVICES: render_devices(); break;
         case GUI_APPS: render_workbench(); break;
         case GUI_APP_DEVICES: render_devices(); break;
+        case GUI_HOSTS: render_hosts(); break;
+        case GUI_HOST_ACTIONS: render_host_actions(); break;
         case GUI_APP_CONFIG: render_app_config(); break;
         case GUI_RECON_CONFIRM: render_recon_confirm(); break;
         case GUI_RECON: render_recon(); break;
         case GUI_RECON_HISTORY: render_recon_history(); break;
+        case GUI_RECON_HISTORY_DETAIL: render_recon_history_detail(); break;
         case GUI_EVIDENCE_PICKER: render_evidence_picker(); break;
         case GUI_EVIDENCE: render_evidence(); break;
         case GUI_AUDIT: render_audit(); break;
@@ -907,12 +973,15 @@ static void open_system_item(void) {
 }
 
 static gui_screen_t parent_screen(gui_screen_t current) {
+    if (current == GUI_APP_CONFIG) return task_return_screen;
     if (current == GUI_FILE_VIEW) {
         return GUI_FILES;
     }
-    if(current==GUI_APP_DEVICES||current==GUI_APP_CONFIG||current==GUI_RECON_CONFIRM||current==GUI_RECON||
-       current==GUI_RECON_HISTORY||current==GUI_EVIDENCE_PICKER||
+    if(current==GUI_APP_DEVICES||current==GUI_RECON_CONFIRM||current==GUI_RECON||
+       current==GUI_HOSTS||current==GUI_RECON_HISTORY||current==GUI_EVIDENCE_PICKER||
        current==GUI_EVIDENCE)return GUI_APPS;
+    if(current==GUI_HOST_ACTIONS)return GUI_HOSTS;
+    if(current==GUI_RECON_HISTORY_DETAIL)return GUI_RECON_HISTORY;
     if ((current == GUI_SECURITY) || (current == GUI_UPDATE) ||
         (current == GUI_SKINS) || (current == GUI_ABOUT) ||
         (current == GUI_RECOVERY) ||
@@ -1013,11 +1082,18 @@ void picopen_gui_handle_key(uint8_t key) {
         return;
     }
     if (key == PICOPEN_KEY_ESCAPE) {
-        if (screen == GUI_RECON_CONFIRM || screen == GUI_RECON_HISTORY ||
-            screen == GUI_EVIDENCE_PICKER) {
-            screen = GUI_APPS;
-            selection = workbench_selection;
-            render_workbench();
+        if (screen == GUI_RECON_CONFIRM) {
+            screen = task_return_screen;
+            selection = screen==GUI_HOST_ACTIONS?host_action_selection:workbench_selection;
+            render();
+            return;
+        }
+        if (screen == GUI_RECON_HISTORY || screen == GUI_EVIDENCE_PICKER) {
+            screen = task_return_screen;
+            selection = screen==GUI_HOST_ACTIONS?host_action_selection:
+                        screen==GUI_RECON_HISTORY_DETAIL?result_selection:
+                        workbench_selection;
+            render();
             return;
         }
         if (screen == GUI_RECON) {
@@ -1027,9 +1103,11 @@ void picopen_gui_handle_key(uint8_t key) {
                 const bool cancelled = picopen_recon_cancel();
                 picopen_audit_record("recon.cancel", cancelled);
             }
-            screen = GUI_APPS;
-            selection = workbench_selection;
-            render_workbench();
+            screen = task_return_screen;
+            selection = screen==GUI_HOST_ACTIONS ? host_action_selection :
+                        screen==GUI_RECON_HISTORY_DETAIL ? result_selection :
+                        workbench_selection;
+            render();
             return;
         }
         if (screen == GUI_EVIDENCE) {
@@ -1077,6 +1155,12 @@ void picopen_gui_handle_key(uint8_t key) {
             selection = home_selection;
         } else if (screen == GUI_SYSTEM) {
             selection = system_selection;
+        } else if (screen == GUI_HOSTS) {
+            selection = host_selection;
+        } else if (screen == GUI_HOST_ACTIONS) {
+            selection = host_action_selection;
+        } else if (screen == GUI_RECON_HISTORY) {
+            selection = result_selection;
         } else if (previous_screen != GUI_FILE_VIEW) {
             selection = 0u;
         }
@@ -1104,12 +1188,13 @@ void picopen_gui_handle_key(uint8_t key) {
             pending_recon_selection = selection;
             const picopen_app_kind_t kind=app_catalog.apps[selection].kind;
             if(kind==PICOPEN_APP_DEVICE_INVENTORY){selection=0u;screen=GUI_APP_DEVICES;render_devices();return;}
+            if(kind==PICOPEN_APP_NETWORK_DISCOVERY){selection=host_selection;screen=GUI_HOSTS;render_hosts();return;}
             if(kind==PICOPEN_APP_EVIDENCE_ANALYZER){selection=files_selection<file_listing.count?files_selection:0u;screen=GUI_EVIDENCE_PICKER;render_evidence_picker();return;}
-            if(kind==PICOPEN_APP_RECENT_RESULTS){screen=GUI_RECON_HISTORY;render_recon_history();return;}
+            if(kind==PICOPEN_APP_RECENT_RESULTS){selection=result_selection;screen=GUI_RECON_HISTORY;render_recon_history();return;}
             task_port=kind==PICOPEN_APP_SSH_BANNER?22u:
                 kind==PICOPEN_APP_TLS_INSPECTOR?443u:
                 kind==PICOPEN_APP_HTTP_INSPECTOR?80u:80u;
-            task_field=0u;task_error[0]='\0';screen=GUI_APP_CONFIG;render_app_config();
+            task_field=0u;task_error[0]='\0';task_return_screen=GUI_APPS;screen=GUI_APP_CONFIG;render_app_config();
             return;
         }
         if (selection != previous) {
@@ -1156,7 +1241,55 @@ void picopen_gui_handle_key(uint8_t key) {
         }
         return;
     }
-    if (screen == GUI_RECON_HISTORY) return;
+    if (screen == GUI_HOSTS) {
+        picopen_host_inventory_t hosts;picopen_hosts_snapshot(&hosts);
+        if(key==PICOPEN_KEY_UP&&selection>0u)--selection;
+        else if(key==PICOPEN_KEY_DOWN&&selection+1u<hosts.count)++selection;
+        else if(key==PICOPEN_KEY_ENTER&&selection<hosts.count){host_selection=selection;host_action_selection=0u;selection=0u;screen=GUI_HOST_ACTIONS;render_host_actions();return;}
+        host_selection=selection;render_hosts();return;
+    }
+    if (screen == GUI_HOST_ACTIONS) {
+        static const picopen_app_kind_t app_kinds[] = {
+            PICOPEN_APP_HOST_INSPECTOR, PICOPEN_APP_HTTP_INSPECTOR,
+            PICOPEN_APP_SSH_BANNER, PICOPEN_APP_TLS_INSPECTOR,
+        };
+        static const uint16_t ports[] = {80u,80u,22u,443u};
+        if(key==PICOPEN_KEY_UP&&selection>0u)--selection;
+        else if(key==PICOPEN_KEY_DOWN&&selection+1u<4u)++selection;
+        else if(key==PICOPEN_KEY_ENTER){
+            picopen_host_inventory_t hosts;picopen_hosts_snapshot(&hosts);
+            if(host_selection<hosts.count){
+                pending_recon_selection=app_index_for_kind(app_kinds[selection]);
+                if(pending_recon_selection>=app_catalog.count){render_host_actions();return;}
+                snprintf(task_target,sizeof(task_target),"%s",hosts.records[host_selection].address);
+                task_target_length=strlen(task_target);task_port=ports[selection];
+                task_field=1u;task_error[0]='\0';host_action_selection=selection;
+                task_return_screen=GUI_HOST_ACTIONS;
+                screen=GUI_APP_CONFIG;render_app_config();return;
+            }
+        }
+        host_action_selection=selection;render_host_actions();return;
+    }
+    if (screen == GUI_RECON_HISTORY) {
+        const size_t count=picopen_recon_history_count();
+        if(key==PICOPEN_KEY_UP&&selection>0u)--selection;
+        else if(key==PICOPEN_KEY_DOWN&&selection+1u<count)++selection;
+        else if(key==PICOPEN_KEY_ENTER&&picopen_recon_history_get(selection,&selected_result)){
+            result_selection=selection;screen=GUI_RECON_HISTORY_DETAIL;render_recon_history_detail();return;
+        }
+        result_selection=selection;render_recon_history();return;
+    }
+    if (screen == GUI_RECON_HISTORY_DETAIL) {
+        if(key==PICOPEN_KEY_ENTER){
+            snprintf(task_target,sizeof(task_target),"%s",selected_result.address[0]?selected_result.address:selected_result.target);
+            task_target_length=strlen(task_target);task_port=selected_result.port;
+            const picopen_app_kind_t kind=selected_result.kind==PICOPEN_RECON_HTTP_HEAD?PICOPEN_APP_HTTP_INSPECTOR:selected_result.kind==PICOPEN_RECON_SSH_BANNER?PICOPEN_APP_SSH_BANNER:selected_result.kind==PICOPEN_RECON_TLS_METADATA?PICOPEN_APP_TLS_INSPECTOR:PICOPEN_APP_HOST_INSPECTOR;
+            pending_recon_selection=app_index_for_kind(kind);
+            if(pending_recon_selection>=app_catalog.count)return;
+            task_field=1u;task_error[0]='\0';task_return_screen=GUI_RECON_HISTORY_DETAIL;screen=GUI_APP_CONFIG;render_app_config();return;
+        }
+        return;
+    }
     if (screen == GUI_EVIDENCE_PICKER) {
         if ((key == PICOPEN_KEY_UP) && selection > 0u) --selection;
         else if ((key == PICOPEN_KEY_DOWN) && selection + 1u < file_listing.count)
