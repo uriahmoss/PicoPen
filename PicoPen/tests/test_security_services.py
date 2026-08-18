@@ -220,7 +220,7 @@ class SecurityServiceBaselineTests(unittest.TestCase):
         self.assertIn("netif_default", wifi)
         self.assertIn("dns_getserver", wifi)
         self.assertIn("picopen_wifi_select_ap", gui)
-        self.assertIn("PREFERENCES_VERSION 2u", preferences)
+        self.assertIn("PREFERENCES_VERSION 3u", preferences)
         self.assertIn("offsetof(picopen_preferences_t, checksum)", preferences)
         self.assertIn("PICOPEN_BOOT_ATTEMPT_OS_ENTERED", recovery)
         self.assertIn("PICOPEN_GUI_STORAGE_SAFE_REMOVE", gui)

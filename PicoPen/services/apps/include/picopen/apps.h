@@ -7,6 +7,7 @@
 
 #include "picopen/storage.h"
 #include "picopen/attachment.h"
+#include "picopen/capability.h"
 
 #define PICOPEN_APP_ID_SIZE 24u
 #define PICOPEN_APP_NAME_SIZE 24u
@@ -26,10 +27,19 @@ typedef enum picopen_app_kind {
     PICOPEN_APP_SD_PACKAGE,
 } picopen_app_kind_t;
 
+typedef enum picopen_app_category {
+    PICOPEN_APP_CATEGORY_SYSTEM = 0,
+    PICOPEN_APP_CATEGORY_NETWORK,
+    PICOPEN_APP_CATEGORY_FILES,
+    PICOPEN_APP_CATEGORY_ATTACHMENT,
+    PICOPEN_APP_CATEGORY_INSTALLED,
+} picopen_app_category_t;
+
 typedef struct picopen_app_descriptor {
     char id[PICOPEN_APP_ID_SIZE];
     char name[PICOPEN_APP_NAME_SIZE];
     picopen_app_kind_t kind;
+    picopen_app_category_t category;
     uint32_t requested_capabilities;
     int16_t required_provider;
     bool built_in;
@@ -49,5 +59,6 @@ void picopen_apps_scan_sd(picopen_storage_service_t *storage);
 void picopen_apps_snapshot(picopen_app_catalog_t *catalog);
 const char *picopen_app_kind_name(picopen_app_kind_t kind);
 bool picopen_app_available(const picopen_app_descriptor_t *app);
+const char *picopen_app_category_name(picopen_app_category_t category);
 
 #endif

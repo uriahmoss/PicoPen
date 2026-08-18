@@ -12,6 +12,9 @@ typedef struct picopen_preferences {
     uint8_t backlight_percent;
     bool wifi_auto_enable;
     uint8_t security_mode;
+    uint8_t apps_selection;
+    uint8_t apps_filter;
+    uint16_t favorite_apps;
     uint32_t checksum;
 } picopen_preferences_t;
 void picopen_preferences_init(void);
@@ -21,4 +24,6 @@ bool picopen_preferences_set_menu(size_t home, size_t system, size_t files);
 bool picopen_preferences_set_backlight(uint8_t percent);
 bool picopen_preferences_set_wifi_auto_enable(bool enabled);
 bool picopen_preferences_set_security_mode(picopen_security_mode_t mode);
+bool picopen_preferences_set_apps(size_t selection, uint8_t filter,
+                                  uint16_t favorites);
 #endif

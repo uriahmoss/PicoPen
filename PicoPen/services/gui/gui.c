@@ -51,6 +51,7 @@ typedef enum gui_screen {
     GUI_FILE_VIEW,
     GUI_DEVICES,
     GUI_APPS,
+    GUI_APP_INFO,
     GUI_APP_DEVICES,
     GUI_HOSTS,
     GUI_HOST_ACTIONS,
@@ -83,6 +84,17 @@ static size_t security_selection;
 static size_t wifi_selection;
 static size_t pending_recon_selection;
 static picopen_app_catalog_t app_catalog;
+typedef enum gui_app_filter {
+    GUI_APP_FILTER_ALL=0, GUI_APP_FILTER_FAVORITES,
+    GUI_APP_FILTER_NETWORK, GUI_APP_FILTER_FILES,
+    GUI_APP_FILTER_SYSTEM, GUI_APP_FILTER_INSTALLED,
+    GUI_APP_FILTER_COUNT,
+} gui_app_filter_t;
+static gui_app_filter_t app_filter;
+static uint16_t favorite_apps;
+static size_t app_view[PICOPEN_APP_CAPACITY];
+static size_t app_view_count;
+static size_t app_info_index;
 static char task_target[PICOPEN_RECON_TARGET_SIZE];
 static size_t task_target_length;
 static uint16_t task_port = 80u;
@@ -562,19 +574,82 @@ static void render_devices(void) {
     present();
 }
 
+static bool app_matches_filter(size_t index, gui_app_filter_t filter) {
+    const picopen_app_descriptor_t *app=&app_catalog.apps[index];
+    if(filter==GUI_APP_FILTER_ALL)return true;
+    if(filter==GUI_APP_FILTER_FAVORITES)return (favorite_apps&(UINT16_C(1)<<index))!=0u;
+    if(filter==GUI_APP_FILTER_NETWORK)return app->category==PICOPEN_APP_CATEGORY_NETWORK;
+    if(filter==GUI_APP_FILTER_FILES)return app->category==PICOPEN_APP_CATEGORY_FILES;
+    if(filter==GUI_APP_FILTER_SYSTEM)return app->category==PICOPEN_APP_CATEGORY_SYSTEM;
+    return app->category==PICOPEN_APP_CATEGORY_INSTALLED;
+}
+
+static void rebuild_app_view(void) {
+    app_view_count=0u;
+    for(size_t index=0u;index<app_catalog.count;++index)
+        if(app_matches_filter(index,app_filter))app_view[app_view_count++]=index;
+    if(selection>=app_view_count){selection=0u;workbench_selection=0u;}
+}
+
+static bool app_filter_has_items(gui_app_filter_t filter) {
+    for(size_t index=0u;index<app_catalog.count;++index)
+        if(app_matches_filter(index,filter))return true;
+    return false;
+}
+
+static void move_app_filter(bool forward) {
+    for(size_t step=0u;step<GUI_APP_FILTER_COUNT;++step){
+        app_filter=(gui_app_filter_t)(forward?
+            ((unsigned)app_filter+1u)%GUI_APP_FILTER_COUNT:
+            ((unsigned)app_filter+GUI_APP_FILTER_COUNT-1u)%GUI_APP_FILTER_COUNT);
+        if(app_filter_has_items(app_filter))break;
+    }
+    selection=0u;workbench_selection=0u;
+}
+
+static const char *app_filter_name(gui_app_filter_t filter) {
+    static const char *const names[]={"ALL","FAVORITES","NETWORK","FILES","SYSTEM","INSTALLED"};
+    return (unsigned)filter<GUI_APP_FILTER_COUNT?names[filter]:"ALL";
+}
+
 static void render_workbench(void) {
     begin("APPS");
-    append("MODE %s  BOUNDARY %s\n\n",
+    rebuild_app_view();
+    append("%-10s %s %s\n\n",app_filter_name(app_filter),
         security_mode==PICOPEN_SECURITY_OWNER?"OWNER":security_mode==PICOPEN_SECURITY_GUARDED?"GUARDED":"DEVELOPER",
         picopen_engagement_session_active(time_us_64()/1000u)?"ACTIVE":"OPTIONAL");
-    const size_t shown=app_catalog.count<GUI_APPS_VISIBLE_ITEMS?app_catalog.count:GUI_APPS_VISIBLE_ITEMS;
-    for(size_t index=0u;index<shown;++index){
-        const picopen_app_descriptor_t *app=&app_catalog.apps[index];
-        append(selection==index?"> %-19.19s%s\n":"  %-19.19s%s\n",app->name,
+    const size_t offset=selection>=GUI_APPS_VISIBLE_ITEMS?
+        selection-(GUI_APPS_VISIBLE_ITEMS-1u):0u;
+    const size_t remaining=app_view_count-offset;
+    const size_t shown=remaining<GUI_APPS_VISIBLE_ITEMS?remaining:GUI_APPS_VISIBLE_ITEMS;
+    for(size_t row=0u;row<shown;++row){
+        const size_t index=offset+row;
+        const size_t catalog_index=app_view[index];
+        const picopen_app_descriptor_t *app=&app_catalog.apps[catalog_index];
+        append(selection==index?">%s %-17.17s%s\n":" %s %-17.17s%s\n",
+               (favorite_apps&(UINT16_C(1)<<catalog_index))?"*":" ",app->name,
                !picopen_app_available(app)?" MISSING":app->built_in?"":" SD");
     }
-    append("\nENTER OPEN  ESC BACK\nSD APPS: /PicoPen/apps\n");
+    if(app_view_count==0u)append("  NO APPS IN THIS VIEW\n");
+    append("\nLEFT/RIGHT VIEW  F FAVORITE\nH INFO  ENTER OPEN  ESC BACK\n");
     present();
+}
+
+static void render_app_info(void) {
+    begin("APP INFO");
+    if(app_info_index>=app_catalog.count){append("\nAPP UNAVAILABLE\nESC BACK\n");present();return;}
+    const picopen_app_descriptor_t *app=&app_catalog.apps[app_info_index];
+    append("\n%s\nID %.23s\nCATEGORY %s\nSOURCE %s\nSTATUS %s\nPROVIDER %s\n\nCAPABILITIES\n",
+           app->name,app->id,picopen_app_category_name(app->category),
+           app->built_in?"BUILT-IN":"SD",picopen_app_available(app)?"AVAILABLE":"MISSING",
+           app->required_provider<0?"ONBOARD":"ATTACHMENT");
+    bool any=false;
+    for(unsigned capability=0u;capability<PICOPEN_CAPABILITY_COUNT;++capability)
+        if(app->requested_capabilities&(UINT32_C(1)<<capability)){
+            append("- %s\n",picopen_capability_name((picopen_capability_t)capability));any=true;
+        }
+    if(!any)append("- NONE\n");
+    append("\nF TOGGLE FAVORITE  ESC BACK\n");present();
 }
 
 static picopen_recon_kind_t recon_kind_for_selection(size_t index) {
@@ -905,6 +980,7 @@ static void render(void) {
         case GUI_FILE_VIEW: render_file(); break;
         case GUI_DEVICES: render_devices(); break;
         case GUI_APPS: render_workbench(); break;
+        case GUI_APP_INFO: render_app_info(); break;
         case GUI_APP_DEVICES: render_devices(); break;
         case GUI_HOSTS: render_hosts(); break;
         case GUI_HOST_ACTIONS: render_host_actions(); break;
@@ -977,7 +1053,7 @@ static gui_screen_t parent_screen(gui_screen_t current) {
     if (current == GUI_FILE_VIEW) {
         return GUI_FILES;
     }
-    if(current==GUI_APP_DEVICES||current==GUI_RECON_CONFIRM||current==GUI_RECON||
+    if(current==GUI_APP_INFO||current==GUI_APP_DEVICES||current==GUI_RECON_CONFIRM||current==GUI_RECON||
        current==GUI_HOSTS||current==GUI_RECON_HISTORY||current==GUI_EVIDENCE_PICKER||
        current==GUI_EVIDENCE)return GUI_APPS;
     if(current==GUI_HOST_ACTIONS)return GUI_HOSTS;
@@ -1001,6 +1077,9 @@ void picopen_gui_init(const picopen_shell_state_t *state) {
     picopen_preferences_t preferences;
     picopen_preferences_get(&preferences);
     security_mode=(picopen_security_mode_t)preferences.security_mode;
+    app_filter=preferences.apps_filter<GUI_APP_FILTER_COUNT?
+        (gui_app_filter_t)preferences.apps_filter:GUI_APP_FILTER_ALL;
+    favorite_apps=preferences.favorite_apps;
     picopen_apps_init();
     picopen_apps_scan_sd(&gui_state.storage_service);
     picopen_apps_snapshot(&app_catalog);
@@ -1011,7 +1090,7 @@ void picopen_gui_init(const picopen_shell_state_t *state) {
         ? preferences.system_selection : 0u;
     files_selection = preferences.files_selection < PICOPEN_STORAGE_MAX_ENTRIES
         ? preferences.files_selection : 0u;
-    workbench_selection = 0u;
+    workbench_selection = preferences.apps_selection;
     security_selection = 0u;
     wifi_selection = 0u;
     selection = home_selection;
@@ -1155,6 +1234,8 @@ void picopen_gui_handle_key(uint8_t key) {
             selection = home_selection;
         } else if (screen == GUI_SYSTEM) {
             selection = system_selection;
+        } else if (screen == GUI_APPS) {
+            selection = workbench_selection;
         } else if (screen == GUI_HOSTS) {
             selection = host_selection;
         } else if (screen == GUI_HOST_ACTIONS) {
@@ -1180,13 +1261,25 @@ void picopen_gui_handle_key(uint8_t key) {
         return;
     }
     if (screen == GUI_APPS) {
+        rebuild_app_view();
         const size_t previous = selection;
         if((key==PICOPEN_KEY_UP)&&selection>0u)--selection;
-        else if((key==PICOPEN_KEY_DOWN)&&selection+1u<app_catalog.count&&selection+1u<GUI_APPS_VISIBLE_ITEMS)++selection;
-        else if(key==PICOPEN_KEY_ENTER && selection<app_catalog.count){
+        else if((key==PICOPEN_KEY_DOWN)&&selection+1u<app_view_count)++selection;
+        else if(key==PICOPEN_KEY_LEFT||key==PICOPEN_KEY_RIGHT){
+            move_app_filter(key==PICOPEN_KEY_RIGHT);
+            (void)picopen_preferences_set_apps(selection,(uint8_t)app_filter,favorite_apps);
+            render_workbench();return;
+        } else if((key=='f'||key=='F')&&selection<app_view_count){
+            favorite_apps^=UINT16_C(1)<<app_view[selection];
+            (void)picopen_preferences_set_apps(selection,(uint8_t)app_filter,favorite_apps);
+            render_workbench();return;
+        } else if((key=='h'||key=='H')&&selection<app_view_count){
+            workbench_selection=selection;app_info_index=app_view[selection];
+            screen=GUI_APP_INFO;render_app_info();return;
+        } else if(key==PICOPEN_KEY_ENTER && selection<app_view_count){
             workbench_selection = selection;
-            pending_recon_selection = selection;
-            const picopen_app_kind_t kind=app_catalog.apps[selection].kind;
+            pending_recon_selection = app_view[selection];
+            const picopen_app_kind_t kind=app_catalog.apps[pending_recon_selection].kind;
             if(kind==PICOPEN_APP_DEVICE_INVENTORY){selection=0u;screen=GUI_APP_DEVICES;render_devices();return;}
             if(kind==PICOPEN_APP_NETWORK_DISCOVERY){selection=host_selection;screen=GUI_HOSTS;render_hosts();return;}
             if(kind==PICOPEN_APP_EVIDENCE_ANALYZER){selection=files_selection<file_listing.count?files_selection:0u;screen=GUI_EVIDENCE_PICKER;render_evidence_picker();return;}
@@ -1199,8 +1292,17 @@ void picopen_gui_handle_key(uint8_t key) {
         }
         if (selection != previous) {
             workbench_selection = selection;
+            (void)picopen_preferences_set_apps(selection,(uint8_t)app_filter,favorite_apps);
         }
         render_workbench();
+        return;
+    }
+    if(screen==GUI_APP_INFO){
+        if((key=='f'||key=='F')&&app_info_index<16u){
+            favorite_apps^=UINT16_C(1)<<app_info_index;
+            (void)picopen_preferences_set_apps(workbench_selection,(uint8_t)app_filter,favorite_apps);
+            render_app_info();
+        }
         return;
     }
     if(screen==GUI_APP_CONFIG){

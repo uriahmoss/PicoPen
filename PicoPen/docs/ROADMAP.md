@@ -133,8 +133,16 @@ review gates and are never implied by acceleration.
     - Keep drivers, authorization enforcement, audit, storage, networking,
       secrets, transmit interlocks, and report export in PicoPen-owned services;
       apps can request operations but cannot access peripherals or flash directly
-    - Add Favorites, Recent, System Apps, and Installed Apps views, hiding empty
+    - [ ] Add Favorites, Recent, System Apps, and Installed Apps views, hiding empty
       categories and preserving an appliance-style Enter/Open and Escape/Back flow
+      - [x] Add persistent All, Favorites, Network, Files, System, and Installed
+        views; empty views are skipped and lists scroll through the full bounded
+        catalog
+      - [x] Add persistent per-app favorites and an app-information screen showing
+        source, category, availability, provider, and requested capabilities
+      - [ ] Add a dedicated Recent-apps view after launch-history persistence is
+        defined
+      - Hardware acceptance pending; see `docs/APPS_NAVIGATION_TEST.md`
     - [x] Add selectable Recent Results details and reuse a result address/port
       as the input to its corresponding inspector
   - Add a reviewed SD-installed application platform in phases

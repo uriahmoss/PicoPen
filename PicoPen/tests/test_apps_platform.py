@@ -34,7 +34,7 @@ class AppsPlatformTests(unittest.TestCase):
         preferences = (ROOT / "services" / "settings" / "preferences.c").read_text(
             encoding="utf-8")
         gui = (ROOT / "services" / "gui" / "gui.c").read_text(encoding="utf-8")
-        self.assertIn("PREFERENCES_VERSION 2u", preferences)
+        self.assertIn("PREFERENCES_VERSION 3u", preferences)
         self.assertIn("picopen_preferences_set_security_mode", preferences)
         self.assertIn("GUI_APP_CONFIG", gui)
         self.assertIn("task_target", gui)
@@ -44,6 +44,21 @@ class AppsPlatformTests(unittest.TestCase):
         self.assertIn("if (started)", gui)
         self.assertIn("START FAILED: CHECK WIFI / RETRY", gui)
         self.assertIn('"<OPTIONAL>"', gui)
+
+    def test_apps_navigation_is_categorized_and_persistent(self):
+        apps = (ROOT / "services" / "apps" / "apps.c").read_text(
+            encoding="utf-8")
+        gui = (ROOT / "services" / "gui" / "gui.c").read_text(
+            encoding="utf-8")
+        preferences = (ROOT / "services" / "settings" /
+                       "preferences.c").read_text(encoding="utf-8")
+        self.assertIn("PICOPEN_APP_CATEGORY_NETWORK", apps)
+        self.assertIn("GUI_APP_FILTER_FAVORITES", gui)
+        self.assertIn("move_app_filter", gui)
+        self.assertIn("GUI_APP_INFO", gui)
+        self.assertIn("F FAVORITE", gui)
+        self.assertIn("picopen_preferences_set_apps", preferences)
+        self.assertIn("legacy_preferences_v2_t", preferences)
 
     def test_device_inventory_does_not_launch_legacy_workbench(self):
         gui = (ROOT / "services" / "gui" / "gui.c").read_text(
